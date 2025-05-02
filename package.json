@@ -1,0 +1,20 @@
+{
+  "name": "mantle",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy --minify"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20250430.0",
+    "@hono/swagger-ui": "^0.5.1",
+    "@hono/zod-validator": "^0.5.0",
+    "hono": "^4.7.8",
+    "hono-openapi": "^0.4.8",
+    "zod": "^3.24.3",
+    "zod-openapi": "^4.2.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  }
+}
