@@ -19,7 +19,8 @@ hello.get(
                     }
                 }
             }
-        }
+        },
+        tags: ["General"]
     }), (c) => {
         return c.text('Hello World!')
     }

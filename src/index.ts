@@ -3,6 +3,8 @@ import { openAPISpecs } from 'hono-openapi'
 import { swaggerUI } from "@hono/swagger-ui";
 import routes from './routes'
 
+import * as packageJson from '../package.json'
+
 const app = new Hono()
 
 app.route('/v1', routes)
@@ -13,9 +15,9 @@ app.get(
     openAPISpecs(app, {
         documentation: {
             info: {
-                title: 'mantle',
-                version: '1.0.0',
-                description: 'Backend API for The Earth App'
+                title: packageJson.name,
+                version: packageJson.version,
+                description: packageJson.description
             },
             servers: [
                 {
@@ -34,7 +36,7 @@ app.get(
 app.get(
     '/',
     swaggerUI({
-        title: 'mantle',
+        title: packageJson.name,
         url: '/openapi',
     })
 )
