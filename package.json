@@ -1,6 +1,8 @@
 {
+  "private": true,
   "name": "mantle",
   "version": "1.0.0",
+  "description": "Backend API for The Earth App",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify"
