@@ -27,6 +27,10 @@ app.get(
                 {
                     url: "https://api.earth-app.com",
                     description: "Production Server"
+                },
+                {
+                    url: "*-mantle.gmitch215.workers.dev",
+                    description: "Preview URLs"
                 }
             ]
         }
