@@ -2,3 +2,12 @@ name = "mantle"
 main = "src/index.ts"
 compatibility_date = "2025-04-28"
 assets = { directory = "public" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "earth-app"
+database_id = "e8807e77-6d72-440c-8180-707077692364"
+
+[[kv_namespaces]]
+binding = "earth_app"
+id = "322faefd5628471cb7cea08cf041804a"
