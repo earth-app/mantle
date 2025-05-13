@@ -7,8 +7,8 @@ RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | b
 ENV NVM_DIR=~/.nvm
 RUN ["/bin/bash", "-c", "source $NVM_DIR/nvm.sh && nvm install --lts"]
 
-# install java
-RUN apt-get install -y openjdk-17-jdk
+# install apt dependencies
+RUN apt-get install -y openjdk-17-jdk vim
 
 # install bun
 RUN curl -fsSL https://bun.sh/install | bash
