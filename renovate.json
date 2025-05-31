@@ -15,13 +15,11 @@
       ]
     }
   ],
-  "npmrcMerge": true,
   "hostRules": [
     {
-      "hostType": "npm",
-      "matchHost": "npm.pkg.github.com",
-      "username": "x-access-token",
-      "password": "${GITHUB_TOKEN}"
+      "matchHost": "https://npm.pkg.github.com",
+      "token": "{{ secrets.GITHUB_TOKEN }}"
     }
-  ]
+  ],
+  "npmrc": "@earth-app:registry=https://npm.pkg.github.com"
 }
