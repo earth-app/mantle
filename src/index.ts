@@ -11,35 +11,54 @@ import { rateLimit } from './util/ratelimit';
 
 import * as packageJson from '../package.json'
 import { bearerAuth } from 'hono/bearer-auth';
+import { getConnInfo } from 'hono/cloudflare-workers';
 
 const app = new Hono()
 
-app.route('/v1', routes)
-
 // Middleware
 if (packageJson.development) {
-    app.use('*', bearerAuth({
-        verifyToken: (token, c) => {
-            return token === c.env.DEVEOPMENT_TOKEN
-        },
-        noAuthenticationHeaderMessage: "Mantle is currently in development mode. Please provide the development token.",
-        invalidTokenMessage: "Invalid development token provided."
-    }))
+    app.use('*', async (c, next) => {
+        const connInfo = getConnInfo(c)
+        if (!connInfo.remote.address) return await next() // Skip if local development
+
+        return await bearerAuth({
+            verifyToken: (token, c) => {
+                return token === c.env.DEVEOPMENT_TOKEN
+            },
+            noAuthenticationHeaderMessage: "Mantle is currently in development mode. Please provide the development token.",
+            invalidTokenMessage: "Invalid development token provided."
+        })(c, next)
+    })
 }
 
 app.use(logger()) // Logger middleware
+app.use(cors({ // CORS middleware
+    origin: '*',
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 3600,
+}))
+app.use((c, next) => {
+    c.res.headers.set('X-Earth-App-Version', packageJson.version)
+    c.res.headers.set('X-Earth-App-Name', packageJson.name)
+
+    if (packageJson.development)
+        c.res.headers.set('X-Earth-App-Environment', 'development')
+    else
+        c.res.headers.set('X-Earth-App-Environment', 'production')
+
+    return next()
+}) // Custom headers middleware
+
 app.use('/v1/*', cache({ // Cache middleware
     cacheName: 'earth-app-cache',
     cacheControl: 'public, max-age=60, s-maxage=60',
     vary: ['Accept-Encoding', 'Authorization'],
 }))
 app.use('/v1/*', (c, next) => rateLimit(c)(c, next)) // Rate limiting middleware
-app.use('/v1/*', cors({ // CORS middleware
-    origin: '*',
-    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 3600,
-}))
+
+// Declare routes
+app.route('/v1', routes)
 
 // OpenAPI & Swagger UI
 app.get(
