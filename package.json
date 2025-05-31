@@ -1,5 +1,6 @@
 {
   "private": true,
+  "development": true,
   "name": "@earth-app/mantle",
   "version": "1.0.0",
   "description": "Backend API for The Earth App",
@@ -8,16 +9,19 @@
     "deploy": "wrangler deploy --minify"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20250430.0",
-    "@earth-app/ocean": "^1.0.0-9b33d02",
+    "@cloudflare/workers-types": "^4.20250531.0",
+    "@earth-app/ocean": "1.0.0-bc53531",
+    "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.1",
     "@hono/zod-validator": "^0.5.0",
-    "hono": "^4.7.8",
+    "hono": "^4.7.10",
     "hono-openapi": "^0.4.8",
-    "zod": "^3.24.3",
-    "zod-openapi": "^4.2.4"
+    "hono-rate-limiter": "^0.4.2",
+    "zod": "^3.25.42",
+    "zod-openapi": "^4.2.4",
+    "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
-    "wrangler": "^4.14.4"
+    "wrangler": "^4.18.0"
   }
 }
