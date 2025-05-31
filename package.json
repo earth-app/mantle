@@ -13,7 +13,7 @@
     "@earth-app/ocean": "1.0.0-bc53531",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.1",
-    "@hono/zod-validator": "^0.5.0",
+    "@hono/zod-validator": "^0.7.0",
     "hono": "^4.7.10",
     "hono-openapi": "^0.4.8",
     "hono-rate-limiter": "^0.4.2",
