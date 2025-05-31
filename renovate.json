@@ -15,5 +15,13 @@
       ]
     }
   ],
-  "npmrcMerge": true
+  "npmrcMerge": true,
+  "hostRules": [
+    {
+      "hostType": "npm",
+      "matchHost": "npm.pkg.github.com",
+      "username": "x-access-token",
+      "password": "${GITHUB_TOKEN}"
+    }
+  ]
 }
