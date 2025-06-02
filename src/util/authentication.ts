@@ -114,9 +114,7 @@ export async function isValidToken(token: string, bindings: Bindings) {
     await checkTableExists(d1)
 
     const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY)
-    const row = await d1.prepare(
-        `SELECT token, encryption_key, encryption_iv, salt, token_hash, expires_at FROM tokens WHERE lookup_hash = ?`
-    )
+    const row = await d1.prepare(`SELECT * FROM tokens WHERE lookup_hash = ?`)
     .bind(lookupHash)
     .first<TokenRow>()
 
@@ -233,9 +231,7 @@ export async function isValidSession(session: string, bindings: Bindings) {
     await checkTableExists(d1)
 
     const lookupHash = await encryption.computeLookupHash(session, bindings.LOOKUP_HMAC_KEY)
-    const row = await d1.prepare(
-        `SELECT token, encryption_key, encryption_iv, salt, token_hash, expires_at FROM tokens WHERE lookup_hash = ? AND is_session = TRUE`
-    )
+    const row = await d1.prepare(`SELECT * FROM tokens WHERE lookup_hash = ? AND is_session = TRUE`)
     .bind(lookupHash)
     .first<TokenRow>()
 

@@ -72,16 +72,38 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
     const iv = crypto.getRandomValues(new Uint8Array(12))
     const encryptedData = await encryption.encryptData(key.rawKey, data, iv)
 
-    const query = `INSERT INTO users (id, username, password, salt, binary, encryption_key, encryption_iv) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    return await bindings.DB.prepare(query).bind(
-        user.id,
-        user.username,
-        util.toBase64(hashedPassword),
-        util.toBase64(salt),
-        encryptedData,
-        JSON.stringify(encryptedKey),
-        util.toBase64(iv)
-    ).run()
+    const exists = `SELECT COUNT(*) as count FROM users WHERE id = ?`
+    const countResult = await bindings.DB.prepare(exists)
+        .bind(user.id)
+        .first<{ count: number }>()
+
+    if (!countResult) throw new Error('Failed to check user existence')
+
+    if (countResult.count > 0) {
+        // Update existing user
+        const updateQuery = `UPDATE users SET username = ?, password = ?, salt = ?, binary = ?, encryption_key = ?, encryption_iv = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+        return await bindings.DB.prepare(updateQuery).bind(
+            user.username,
+            util.toBase64(hashedPassword),
+            util.toBase64(salt),
+            encryptedData,
+            JSON.stringify(encryptedKey),
+            util.toBase64(iv),
+            user.id
+        ).run()
+    } else {
+        // Insert new user
+        const query = `INSERT INTO users (id, username, password, salt, binary, encryption_key, encryption_iv) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        return await bindings.DB.prepare(query).bind(
+            user.id,
+            user.username,
+            util.toBase64(hashedPassword),
+            util.toBase64(salt),
+            encryptedData,
+            JSON.stringify(encryptedKey),
+            util.toBase64(iv)
+        ).run()
+    }
 }
 
 async function findUser(query: string, param: string, bindings: Bindings) {
