@@ -2,6 +2,7 @@ import { Hono } from "hono"
 import { describeRoute } from "hono-openapi"
 import { resolver } from "hono-openapi/zod"
 import * as schemas from "../openapi/schemas"
+import * as tags from "../openapi/tags"
 
 import * as packageJson from '../../package.json'
 
@@ -22,7 +23,7 @@ info.get(
                 }
             }
         },
-        tags: ["General"]
+        tags: [tags.GENERAL],
     }), (c) => {
         return c.json({
             name: packageJson.name,
