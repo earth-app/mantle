@@ -20,3 +20,11 @@ export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
     return result === 0
 }
+
+export function getCredentials(basic: string) {
+    if (!basic.startsWith('Basic ')) throw new Error('Invalid Basic Auth format');
+    
+    const base64Credentials = basic.slice(6);
+    const credentials = atob(base64Credentials);
+    return credentials.split(':', 2);
+}
