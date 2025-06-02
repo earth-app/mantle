@@ -1,6 +1,9 @@
 import z from "zod"
 import "zod-openapi/extend"
 
+import { LoginUser, User } from "../types/users"
+import { resolver } from "hono-openapi/zod"
+
 // Root Types
 export const error = z.object({
     code: z.number().openapi({ example: 400 }),
@@ -32,12 +35,25 @@ export const userCreate = z.object({
 })
 
 /// Return Objects
-const returnObject = z.object({
-    type: text.openapi({ example: "com.earthapp.Exportable" })
-})
+export const user = z.custom<User>()
+export const loginResponse = z.custom<LoginUser>()
 
-export const user = returnObject.extend({
-    id: id,
-    username: username,
-    email: email,
-})
+// Reponse Schemas
+
+export const badRequest = {
+    description: "Bad request",
+    content: {
+        'application/json': {
+            schema: resolver(error),
+        }
+    }
+}
+
+export const unauthorized = {
+    description: "Unauthorized",
+    content: {
+        'application/json': {
+            schema: resolver(error),
+        }
+    }
+}
