@@ -12,8 +12,9 @@ import { rateLimit } from './util/ratelimit';
 import * as packageJson from '../package.json'
 import { bearerAuth } from 'hono/bearer-auth';
 import { getConnInfo } from 'hono/cloudflare-workers';
+import Bindings from './bindings';
 
-const app = new Hono()
+const app = new Hono<{ Bindings: Bindings }>()
 
 // Middleware
 if (packageJson.development) {
@@ -55,7 +56,7 @@ app.use('/v1/*', cache({ // Cache middleware
     cacheControl: 'public, max-age=60, s-maxage=60',
     vary: ['Accept-Encoding', 'Authorization'],
 }))
-app.use('/v1/*', (c, next) => rateLimit(c)(c, next)) // Rate limiting middleware
+app.use('/v1/*', rateLimit())
 
 // Declare routes
 app.route('/v1', routes)
@@ -83,7 +84,24 @@ app.get(
                     url: "*-mantle.gmitch215.workers.dev",
                     description: "Preview URLs"
                 }
-            ]
+            ],
+            components: {
+                securitySchemes: {
+                    BasicAuth: {
+                        type: 'http',
+                        scheme: 'basic',
+                    },
+                    BearerAuth: {
+                        type: 'http',
+                        scheme: 'bearer',
+                        bearerFormat: 'JWT',
+                    },
+                },
+            },
+            security: [
+                { BasicAuth: [] },
+                { BearerAuth: [] },
+            ],
         }
     })
 )
