@@ -1,11 +1,13 @@
 import { bearerAuth } from 'hono/bearer-auth'
 import { basicAuth } from 'hono/basic-auth'
-import { crypto, D1Database } from '@cloudflare/workers-types'
+import { D1Database } from '@cloudflare/workers-types'
 import * as ocean from '@earth-app/ocean'
+
 import * as encryption from './encryption'
 import * as util from "./util"
 import Bindings from '../bindings'
 import { Context } from 'hono'
+import { getUserById } from './users'
 
 type TokenRow = {
     id: number
@@ -159,6 +161,22 @@ export async function getTokenCount(owner: string, d1: D1Database) {
     return result ? result.count : 0
 }
 
+export async function getOwnerOfToken(token: string, bindings: Bindings) {
+    if (!token) throw new Error('Token is required')
+    
+    const d1 = bindings.DB
+    await checkTableExists(d1)
+
+    const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY)
+    const row = await d1.prepare(`SELECT owner FROM tokens WHERE lookup_hash = ?`)
+        .bind(lookupHash)
+        .first<{ owner: string }>()
+    
+    if (!row) return null
+
+    return await getUserById(row.owner, bindings)
+}
+
 // Session Management
 
 export async function validateSessions(owner: string, d1: D1Database) {
@@ -278,7 +296,11 @@ export async function bumpCurrentSession(owner: string, d1: D1Database) {
 export function bearerAuthMiddleware() {
     return bearerAuth({
         verifyToken: async (token: string, c: Context) => {
-            return await isValidToken(token, c.env)
+            if (token.length !== ocean.com.earthapp.util.API_KEY_LENGTH) return false
+
+            if (token.startsWith('EA25')) return await isValidToken(token, c.env)
+
+            return await isValidSession(token, c.env)
         }
     })
 }
