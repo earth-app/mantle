@@ -3,17 +3,33 @@ import * as ocean from '@earth-app/ocean'
 import * as encryption from './encryption'
 import * as util from "./util"
 import Bindings from '../bindings'
+import { UserObject, User, toUser, LoginUser } from '../types/users'
+import { addSession } from './authentication'
 
 // Helpers
 
-async function createUser(username: string, callback: (user: ocean.com.earthapp.account.Account) => void) {
+export async function createUser(username: string, callback: (user: ocean.com.earthapp.account.Account) => void) {
     const id = ocean.com.earthapp.account.Account.newId()
     const user = new ocean.com.earthapp.account.Account(id, username)
     callback(user)
+    
     return user
 }
 
 // Database
+export type DBUser = {
+    id: string,
+    username: string,
+    password: string,
+    salt: string,
+    binary: Uint8Array,
+    encryption_key: string,
+    encryption_iv: string,
+    last_login?: Date,
+    created_at: Date,
+    updated_at?: Date
+}
+
 async function checkTableExists(d1: D1Database) {
     const query = `CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY NOT NULL,
@@ -28,9 +44,22 @@ async function checkTableExists(d1: D1Database) {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`
     await d1.prepare(query).run()
+
+    // Indexes for performance
+    const idIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id)`
+    await d1.prepare(idIndexQuery).run()
+
+    const usernameIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username)`
+    await d1.prepare(usernameIndexQuery).run()
+
+    const lastLoginIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login)`
+    await d1.prepare(lastLoginIndexQuery).run()
+
+    const updatedAtIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at)`
+    await d1.prepare(updatedAtIndexQuery).run()
 }
 
-async function saveUser(user: ocean.com.earthapp.account.Account, password: string, bindings: Bindings) {
+export async function saveUser(user: ocean.com.earthapp.account.Account, password: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
 
     const salt = crypto.getRandomValues(new Uint8Array(16))
@@ -58,13 +87,9 @@ async function saveUser(user: ocean.com.earthapp.account.Account, password: stri
 async function findUser(query: string, param: string, bindings: Bindings) {
     const result = await bindings.DB.prepare(query)
         .bind(param)
-        .all<{
-            binary: any,
-            encryption_key: string,
-            encryption_iv: string
-        }>()
+        .all<DBUser>()
 
-    const users = await Promise.all(result.results.map(async (row) => {
+    const users: UserObject[] = await Promise.all(result.results.map(async (row) => {
         const { binary, encryption_key, encryption_iv } = row
         if (!binary || !encryption_key || !encryption_iv)
             throw new Error('Missing required fields')
@@ -85,27 +110,51 @@ async function findUser(query: string, param: string, bindings: Bindings) {
             binary0,
         )
         
-        return ocean.fromBinary(new Int8Array(decryptedData)) as ocean.com.earthapp.account.Account
+        const accountData = ocean.fromBinary(new Int8Array(decryptedData)) as ocean.com.earthapp.account.Account
+
+        return { public: toUser(accountData, row.created_at, row.updated_at, row.last_login), database: row, account: accountData }
     }))
 
     return users
 }
 
-async function getUserById(id: string, bindings: Bindings) {
+// Login Function
+
+// assume already authenticated via Basic Auth
+export async function loginUser(username: string, bindings: Bindings): Promise<LoginUser> {
+    await checkTableExists(bindings.DB)
+
+    const dbuser = await getUserByUsername(username, bindings)
+    if (!dbuser) {
+        throw new Error('User not found')
+    }
+
+    const user = dbuser.database
+
+    // Create session
+    const session = await addSession(user.id, bindings)
+
+    // Update last login
+    const query = `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`
+    await bindings.DB.prepare(query).bind(user.id).run()
+
+    return {
+        id: user.id,
+        username: user.username,
+        session_token: session
+    }
+}
+
+// User retrieval functions
+
+export async function getUserById(id: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
     const results = await findUser("SELECT * FROM users WHERE id = ?", id, bindings)
     return results.length ? results[0] : null
 }
 
-async function getUserByUsername(username: string, bindings: Bindings) {
+export async function getUserByUsername(username: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
     const results = await findUser("SELECT * FROM users WHERE username = ?", username, bindings)
     return results.length ? results[0] : null
-}
-
-export default {
-    createUser,
-    saveUser,
-    getUserById,
-    getUserByUsername,
 }

@@ -1,13 +1,14 @@
 import { Hono } from "hono"
+
 import { describeRoute } from "hono-openapi"
 import { resolver } from "hono-openapi/zod"
 import type { OpenAPIV3 } from "openapi-types"
 import zodToJsonSchema from "zod-to-json-schema"
+import * as schemas from "../../openapi/schemas"
+import * as tags from "../../openapi/tags"
 
 import Bindings from "../../bindings"
-import * as schemas from "../../openapi/schemas"
-import users from "../../util/users"
-import { bearerAuthMiddleware } from "../../util/authentication"
+import * as users from "../../util/users"
 
 const createUser = new Hono<{ Bindings: Bindings }>()
 
@@ -34,16 +35,9 @@ createUser.post(
                     }
                 }
             },
-            400: {
-                description: "Bad request",
-                content: {
-                    'application/json': {
-                        schema: resolver(schemas.error),
-                    }
-                }
-            }
+            400: schemas.badRequest
         },
-        tags: ["Users"],
+        tags: [tags.USERS],
     }),
     async (c) => {
         const { username, email, password } = await c.req.json()
@@ -75,9 +69,9 @@ createUser.post(
             return c.json({
                 code: 400,
                 message: result.error
-            })
+            }, 400)
 
-        return c.json(JSON.parse(user.toJson()))
+        return c.json(user)
     }
 )
 
