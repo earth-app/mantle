@@ -30,6 +30,32 @@ export type DBUser = {
     updated_at?: Date
 }
 
+async function toUserObject(row: DBUser, bindings: Bindings): Promise<UserObject> {
+    const { binary, encryption_key, encryption_iv } = row
+    if (!binary || !encryption_key || !encryption_iv)
+        throw new Error('Missing required fields')
+
+    const binary0 = new Uint8Array(binary)
+    const parsedKey = JSON.parse(encryption_key)
+    const decryptedKey = await encryption.decryptKey(
+        bindings.KEK,
+        {
+            key: parsedKey.key,
+            iv: parsedKey.iv,
+        }
+    )
+    
+    const decryptedData = await encryption.decryptData(
+        decryptedKey,
+        util.fromBase64(encryption_iv),
+        binary0,
+    )
+    
+    const accountData = ocean.fromBinary(new Int8Array(decryptedData)) as ocean.com.earthapp.account.Account
+
+    return { public: toUser(accountData, row.created_at, row.updated_at, row.last_login), database: row, account: accountData }
+}
+
 async function checkTableExists(d1: D1Database) {
     const query = `CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY NOT NULL,
@@ -52,10 +78,13 @@ async function checkTableExists(d1: D1Database) {
     const usernameIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username)`
     await d1.prepare(usernameIndexQuery).run()
 
-    const lastLoginIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login)`
+    const lastLoginIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC)`
     await d1.prepare(lastLoginIndexQuery).run()
 
-    const updatedAtIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at)`
+    const createdAtIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC)`
+    await d1.prepare(createdAtIndexQuery).run()
+
+    const updatedAtIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC)`
     await d1.prepare(updatedAtIndexQuery).run()
 }
 
@@ -111,33 +140,7 @@ async function findUser(query: string, param: string, bindings: Bindings) {
         .bind(param)
         .all<DBUser>()
 
-    const users: UserObject[] = await Promise.all(result.results.map(async (row) => {
-        const { binary, encryption_key, encryption_iv } = row
-        if (!binary || !encryption_key || !encryption_iv)
-            throw new Error('Missing required fields')
-
-        const binary0 = new Uint8Array(binary)
-        const parsedKey = JSON.parse(encryption_key)
-        const decryptedKey = await encryption.decryptKey(
-            bindings.KEK,
-            {
-                key: parsedKey.key,
-                iv: parsedKey.iv,
-            }
-        )
-        
-        const decryptedData = await encryption.decryptData(
-            decryptedKey,
-            util.fromBase64(encryption_iv),
-            binary0,
-        )
-        
-        const accountData = ocean.fromBinary(new Int8Array(decryptedData)) as ocean.com.earthapp.account.Account
-
-        return { public: toUser(accountData, row.created_at, row.updated_at, row.last_login), database: row, account: accountData }
-    }))
-
-    return users
+    return await Promise.all(result.results.map(async (row) => await toUserObject(row, bindings)))
 }
 
 // Login Function
@@ -179,4 +182,14 @@ export async function getUserByUsername(username: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
     const results = await findUser("SELECT * FROM users WHERE username = ?", username, bindings)
     return results.length ? results[0] : null
+}
+
+export async function getUsers(bindings: Bindings, limit: number = 25, page: number = 0) {
+    await checkTableExists(bindings.DB)
+    const query = `SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    const results = await bindings.DB.prepare(query)
+        .bind(limit, page * limit)
+        .all<DBUser>()
+
+    return Promise.all(results.results.map(async (row) => await toUserObject(row, bindings)))
 }
