@@ -35,8 +35,31 @@ export const userCreate = z.object({
 })
 
 /// Return Objects
-export const user = z.custom<User>()
-export const loginResponse = z.custom<LoginUser>()
+export const user = z.custom<User>().openapi({
+    example: {
+        id: "eb9137b1272938",
+        username: "johndoe",
+        created_at: new Date(),
+        updated_at: new Date(),
+        last_login: new Date(),
+        account: {
+            type: "ocean.com.earthapp.account.Account",
+            id: "account123",
+            username: "johndoe",
+            email: "account@gmail.com",
+            country: "US",
+            phoneNumber: 1234567890,
+        }
+    }
+})
+export const users = z.array(user)
+export const loginResponse = z.custom<LoginUser>().openapi({
+    example: {
+        id: "eb9137b1272938",
+        username: "johndoe",
+        session_token: "abc123xyz456",
+    }
+})
 
 // Reponse Schemas
 
