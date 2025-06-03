@@ -27,6 +27,7 @@ if (packageJson.development) {
             verifyToken: (token, c) => {
                 return token === c.env.DEVEOPMENT_TOKEN
             },
+            headerName: 'X-Development-Token',
             noAuthenticationHeaderMessage: "Mantle is currently in development mode. Please provide the development token.",
             invalidTokenMessage: "Invalid development token provided."
         })(c, next)
