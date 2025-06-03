@@ -27,7 +27,7 @@ createUser.post(
             }
         },
         responses: {
-            200: {
+            201: {
                 description: "User created successfully",
                 content: {
                     'application/json': {
@@ -71,7 +71,7 @@ createUser.post(
                 message: result.error
             }, 400)
 
-        return c.json(user)
+        return c.json(user, 201)
     }
 )
 
