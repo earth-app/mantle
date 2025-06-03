@@ -7,7 +7,7 @@ import * as encryption from './encryption'
 import * as util from "./util"
 import Bindings from '../bindings'
 import { Context } from 'hono'
-import { getUserById } from './users'
+import { getUserById, getUserByUsername } from './users'
 
 type TokenRow = {
     id: number
@@ -33,13 +33,22 @@ async function checkTableExists(d1: D1Database) {
         lookup_hash TEXT NOT NULL UNIQUE,
         salt TEXT NOT NULL,
         is_session BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         expires_at TIMESTAMP DEFAULT (datetime('now', '+30 days'))
     )`
     await d1.prepare(query).run()
 
-    const indexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_lookup_hash ON tokens (lookup_hash)`
-    await d1.prepare(indexQuery).run()
+    const hashIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_lookup_hash ON tokens (lookup_hash)`
+    await d1.prepare(hashIndexQuery).run()
+
+    const ownerIndexQuery = `CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens (owner)`
+    await d1.prepare(ownerIndexQuery).run()
+
+    const sessionIndexQuery = `CREATE INDEX IF NOT EXISTS idx_tokens_is_session ON tokens (is_session)`
+    await d1.prepare(sessionIndexQuery).run()
+
+    const expiresIndexQuery = `CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens (expires_at)`
+    await d1.prepare(expiresIndexQuery).run()
 }
 
 async function hashToken(token: string, secret: Uint8Array): Promise<string> {
@@ -72,7 +81,7 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 
     const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY)
 
-    const query = `INSERT INTO tokens (owner, token, encryption_key, encryption_iv, token_hash, lookup_hash, salt, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    const query = `INSERT INTO tokens (owner, token, encryption_key, encryption_iv, token_hash, lookup_hash, salt, is_session, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     await d1.prepare(query).bind(
         owner,
         encryptedToken,
@@ -204,9 +213,16 @@ export async function validateSessions(owner: string, d1: D1Database) {
     }
 }
 
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 export function generateSessionToken() {
-    const session = crypto.getRandomValues(new Uint8Array(ocean.com.earthapp.util.API_KEY_LENGTH))
-    return util.toBase64(session)
+   
+    let session = ''
+    for (let i = 0; i < ocean.com.earthapp.util.API_KEY_LENGTH; i++) {
+        const randomChar = chars.charAt(Math.floor(Math.random() * chars.length))
+        session += randomChar
+    }
+
+    return session
 }
 
 export async function addSession(owner: string, bindings: Bindings, expiration: number = 14) {
@@ -304,11 +320,12 @@ export function bearerAuthMiddleware() {
 export function basicAuthMiddleware() {
     return basicAuth({
         verifyUser: async (username: string, password: string, c: Context) => {
-            const user = await c.env.USERS.getUserByUsername(username, c.env)
-            if (!user) return false
-
+            const dbuser = await getUserByUsername(username, c.env)
+            if (!dbuser) return false
+            
+            const user = dbuser.database
             const salt = util.fromBase64(user.salt)
-            return await encryption.comparePassword(password, salt, util.fromBase64(user.hashedPassword))
+            return await encryption.comparePassword(password, salt, util.fromBase64(user.password))
         }
     })
 }
