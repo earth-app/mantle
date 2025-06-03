@@ -5,6 +5,7 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { cache } from 'hono/cache';
+import { secureHeaders } from 'hono/secure-headers'
 
 import routes from './routes'
 import { rateLimit } from './util/ratelimit';
@@ -32,6 +33,7 @@ if (packageJson.development) {
     })
 }
 
+app.use(secureHeaders()) // Secure headers middleware
 app.use(logger()) // Logger middleware
 app.use(cors({ // CORS middleware
     origin: '*',
