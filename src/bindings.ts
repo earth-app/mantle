@@ -10,6 +10,7 @@ type Bindings = {
     KEK: string
     LOOKUP_HMAC_KEY: string
     DEVEOPMENT_TOKEN: string
+    ADMIN_API_KEY: string
 }
 
 export default Bindings

@@ -317,6 +317,15 @@ export function bearerAuthMiddleware() {
     })
 }
 
+export function adminMiddleware() {
+    return bearerAuth({
+        verifyToken: async (token: string, c: Context<{ Bindings: Bindings }>) => {
+            if (token.length !== ocean.com.earthapp.util.API_KEY_LENGTH) return false
+            return token === c.env.ADMIN_API_KEY
+        }
+    })
+}
+
 export function basicAuthMiddleware() {
     return basicAuth({
         verifyUser: async (username: string, password: string, c: Context) => {

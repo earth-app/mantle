@@ -5,15 +5,21 @@ import * as util from "./util"
 import Bindings from '../bindings'
 import { UserObject, User, toUser, LoginUser } from '../types/users'
 import { addSession } from './authentication'
+import { HTTPException } from 'hono/http-exception'
 
 // Helpers
 
 export async function createUser(username: string, callback: (user: ocean.com.earthapp.account.Account) => void) {
-    const id = ocean.com.earthapp.account.Account.newId()
-    const user = new ocean.com.earthapp.account.Account(id, username)
-    callback(user)
-    
-    return user
+    try {
+        const id = ocean.com.earthapp.account.Account.newId()
+        const user = new ocean.com.earthapp.account.Account(id, username)
+        callback(user)
+
+        return user
+    } catch (error) {
+        throw new HTTPException(401, { message: `Failed to create user: ${error}` })
+    }
+
 }
 
 // Database
@@ -33,7 +39,7 @@ export type DBUser = {
 async function toUserObject(row: DBUser, bindings: Bindings): Promise<UserObject> {
     const { binary, encryption_key, encryption_iv } = row
     if (!binary || !encryption_key || !encryption_iv)
-        throw new Error('Missing required fields')
+        throw new HTTPException(500, { message: 'Missing required fields for decryption' })
 
     const binary0 = new Uint8Array(binary)
     const parsedKey = JSON.parse(encryption_key)
@@ -91,6 +97,9 @@ async function checkTableExists(d1: D1Database) {
 export async function saveUser(user: ocean.com.earthapp.account.Account, password: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
 
+    if (password.length < 8 || password.length > 100)
+        throw new HTTPException(400, { message: 'Password must be between 8 and 100 characters' })
+
     const salt = crypto.getRandomValues(new Uint8Array(16))
     const hashedPassword = await encryption.derivePasswordKey(password, salt)
 
@@ -106,7 +115,7 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
         .bind(user.id)
         .first<{ count: number }>()
 
-    if (!countResult) throw new Error('Failed to check user existence')
+    if (!countResult) throw new HTTPException(500, { message: 'Failed to check user existence' })
 
     if (countResult.count > 0) {
         // Update existing user
@@ -135,6 +144,33 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
     }
 }
 
+export async function updateUser(user: UserObject, bindings: Bindings) {
+    await checkTableExists(bindings.DB)
+
+    const usernameQuery = `UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+    await bindings.DB.prepare(usernameQuery)
+        .bind(user.account.username, user.database.id)
+        .run()
+    
+    const data = new Uint8Array(user.account.toBinary())
+    const encryptionKey = JSON.parse(user.database.encryption_key)
+    const decryptedKey = await encryption.decryptKey(
+        bindings.KEK,
+        {
+            key: encryptionKey.key,
+            iv: encryptionKey.iv,
+        }
+    )
+
+    const iv = util.fromBase64(user.database.encryption_iv)
+    const encryptedData = await encryption.encryptData(decryptedKey, data, iv)
+
+    const updateBinaryQuery = `UPDATE users SET binary = ? WHERE id = ?`
+    await bindings.DB.prepare(updateBinaryQuery)
+        .bind(encryptedData, user.database.id)
+        .run()
+}
+
 async function findUser(query: string, param: string, bindings: Bindings) {
     const result = await bindings.DB.prepare(query)
         .bind(param)
@@ -150,9 +186,8 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
     await checkTableExists(bindings.DB)
 
     const dbuser = await getUserByUsername(username, bindings)
-    if (!dbuser) {
-        throw new Error('User not found')
-    }
+    if (!dbuser)
+        throw new HTTPException(401, { message: 'User not found' })
 
     const user = dbuser.database
 
@@ -192,4 +227,34 @@ export async function getUsers(bindings: Bindings, limit: number = 25, page: num
         .all<DBUser>()
 
     return Promise.all(results.results.map(async (row) => await toUserObject(row, bindings)))
+}
+
+// User update functions
+
+export async function patchUser(account: ocean.com.earthapp.account.Account, data: Partial<ocean.com.earthapp.account.Account>, bindings: Bindings) {
+    await checkTableExists(bindings.DB)
+
+    let newAccount = account.deepCopy() as ocean.com.earthapp.account.Account
+    newAccount = newAccount.patch(
+        data.username ?? account.username,
+        data.firstName ?? account.firstName,
+        data.lastName ?? account.lastName,
+        data.email ?? account.email,
+        data.address ?? account.address,
+        data.country ?? account.country,
+        data.phoneNumber ?? account.phoneNumber,
+        data.visibility ?? account.visibility,
+    )
+
+    try {
+        newAccount.validate()
+    } catch (error) {
+        throw new HTTPException(400, { message: `Invalid account data: ${error}` })
+    }
+
+    const userObject = await getUserById(account.id, bindings)
+    if (!userObject) throw new HTTPException(401, { message: 'User not found' })
+    
+    userObject.account = newAccount
+    await updateUser(userObject, bindings)
 }

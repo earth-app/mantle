@@ -53,7 +53,7 @@ createUser.post(
                 code: 400,
                 message: "User already exists"
             }, 400)
-
+        
         const user = await users.createUser(username, (user) => {
             user.email = email
         })
