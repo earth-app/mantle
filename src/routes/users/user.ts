@@ -8,7 +8,7 @@ import * as schemas from "../../openapi/schemas"
 import * as tags from "../../openapi/tags"
 
 import Bindings from "../../bindings";
-import { getUserById, patchUser } from "../../util/users";
+import { deleteUser, getUserById, patchUser } from "../../util/users";
 import { bearerAuthMiddleware, getOwnerOfToken } from "../../util/authentication";
 import { UserObject } from "../../types/users";
 
@@ -232,6 +232,82 @@ user.patch(
         const returned = (await getUserById(user.account.id, c.env))!.public
         
         return c.json(returned, 200)
+    }
+)
+user.delete(
+    '/',
+    describeRoute({
+        summary: "Deletes a user",
+        description: "Deletes the user by ID or based on the provided Bearer token.",
+        security: [{ BearerAuth: [] }],
+        responses: {
+            204: {
+                description: "User deleted successfully"
+            },
+            400: schemas.badRequest,
+            401: schemas.unauthorized,
+            403: schemas.forbidden,
+            404: {
+                description: "User not found",
+                content: {
+                    'application/json': {
+                        schema: resolver(schemas.error(404, "User not found")),
+                    }
+                }
+            }
+        },
+        tags: [tags.USERS],
+    }),
+    bearerAuthMiddleware(),
+    async (c) => {
+        const byId = c.req.param('id')
+        const bearerToken = c.req.header('Authorization')
+        if (!bearerToken || !bearerToken.startsWith('Bearer ')) {
+            return c.json({
+                code: 401,
+                message: "Unauthorized"
+            }, 401)
+        }
+
+        const token = bearerToken.slice(7)
+
+        let user: UserObject | null;
+        if (byId) {
+            user = await getUserById(byId, c.env)
+            if (!user) {
+                return c.json({
+                    code: 404,
+                    message: "User not found"
+                }, 404)
+            }
+
+            if (token !== c.env.ADMIN_API_KEY) {
+                return c.json({
+                    code: 403,
+                    message: "Forbidden: You do not have permission to delete this user."
+                }, 403)
+            }
+        } else {
+            user = await getOwnerOfToken(token, c.env)
+            if (!user) {
+                return c.json({
+                    code: 401,
+                    message: "Unauthorized"
+                }, 401)
+            }
+        }
+
+        if (!user) {
+            return c.json({
+                code: 404,
+                message: "User not found"
+            }, 404)
+        }
+
+        // Delete the user
+        await deleteUser(user.account.id, c.env)
+
+        return c.body(null, 204)
     }
 )
 
