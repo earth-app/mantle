@@ -117,10 +117,11 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
 
     if (!countResult) throw new HTTPException(500, { message: 'Failed to check user existence' })
 
+    let result: D1Result;
     if (countResult.count > 0) {
         // Update existing user
         const updateQuery = `UPDATE users SET username = ?, password = ?, salt = ?, binary = ?, encryption_key = ?, encryption_iv = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-        return await bindings.DB.prepare(updateQuery).bind(
+        result = await bindings.DB.prepare(updateQuery).bind(
             user.username,
             util.toBase64(hashedPassword),
             util.toBase64(salt),
@@ -132,7 +133,7 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
     } else {
         // Insert new user
         const query = `INSERT INTO users (id, username, password, salt, binary, encryption_key, encryption_iv) VALUES (?, ?, ?, ?, ?, ?, ?)`
-        return await bindings.DB.prepare(query).bind(
+        result = await bindings.DB.prepare(query).bind(
             user.id,
             user.username,
             util.toBase64(hashedPassword),
@@ -142,6 +143,14 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
             util.toBase64(iv)
         ).run()
     }
+
+    if (!result)
+        throw new HTTPException(400, { message: 'Failed to save user' })
+    
+    if (result.error)
+        throw new HTTPException(400, { message: `Database error: ${result.error}` })
+
+    return await getUserById(user.id, bindings)
 }
 
 export async function updateUser(user: UserObject, bindings: Bindings) {
@@ -229,6 +238,32 @@ export async function getUsers(bindings: Bindings, limit: number = 25, page: num
     return Promise.all(results.results.map(async (row) => await toUserObject(row, bindings)))
 }
 
+export async function getAccountBy(predicate: (account: ocean.com.earthapp.account.Account) => boolean, bindings: Bindings): Promise<UserObject | null> {
+    await checkTableExists(bindings.DB)
+
+    let user: UserObject | null = null;
+    let page = 0;
+    while (!user) {
+        const results = await getUsers(bindings, 100, page)
+        if (results.length === 0) break;
+
+        for (const u of results) {
+            if (predicate(u.account)) {
+                user = u;
+                break;
+            }
+        }
+
+        page++;
+    }
+
+    return user;
+}
+
+export async function getUserByEmail(email: string, bindings: Bindings) {
+    return await getAccountBy((acc) => acc.email === email, bindings);
+}
+
 // User update functions
 
 export async function patchUser(account: ocean.com.earthapp.account.Account, data: Partial<ocean.com.earthapp.account.Account>, bindings: Bindings) {
@@ -257,4 +292,14 @@ export async function patchUser(account: ocean.com.earthapp.account.Account, dat
     
     userObject.account = newAccount
     await updateUser(userObject, bindings)
+}
+
+export async function deleteUser(id: string, bindings: Bindings) {
+    await checkTableExists(bindings.DB)
+
+    const query = `DELETE FROM users WHERE id = ?`
+    const result = await bindings.DB.prepare(query).bind(id).run()
+
+    if (result.error)
+        throw new HTTPException(404, { message: 'User not found' })
 }

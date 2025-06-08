@@ -47,11 +47,18 @@ createUser.post(
                 message: "Missing required fields"
             }, 400)
 
-        const existing = await users.getUserByUsername(username, c.env)
-        if (existing)
+        const usernameExists = await users.getUserByUsername(username, c.env)
+        if (usernameExists)
             return c.json({
                 code: 400,
-                message: "User already exists"
+                message: `Username ${username} already exists`
+            }, 400)
+
+        const emailExists = await users.getUserByEmail(email, c.env)
+        if (emailExists)
+            return c.json({
+                code: 400,
+                message: `Email ${email} is already registered`
             }, 400)
         
         const user = await users.createUser(username, (user) => {
@@ -64,14 +71,8 @@ createUser.post(
                 code: 400,
                 message: "Failed to create user"
             }, 400)
-        
-        if (result.error)
-            return c.json({
-                code: 400,
-                message: result.error
-            }, 400)
 
-        return c.json(user, 201)
+        return c.json(result.public, 201)
     }
 )
 
