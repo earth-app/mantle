@@ -12,7 +12,7 @@
     "@cloudflare/workers-types": "^4.20250607.0",
     "@earth-app/ocean": "1.0.0-683056b",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
-    "@hono/swagger-ui": "^0.5.1",
+    "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-validator": "^0.7.0",
     "hono": "^4.7.11",
     "hono-openapi": "^0.4.8",
