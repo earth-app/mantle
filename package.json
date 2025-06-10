@@ -1,6 +1,5 @@
 {
   "private": true,
-  "development": true,
   "name": "@earth-app/mantle",
   "version": "1.0.0",
   "description": "Backend API for The Earth App",
