@@ -40,7 +40,9 @@ createUser.post(
         tags: [tags.USERS],
     }),
     async (c) => {
-        const { username, email, password } = await c.req.json()
+        const req = await c.req.json()
+        const { username, email, password } = req
+
         if (!username || !email || !password)
             return c.json({
                 code: 400,
@@ -63,6 +65,12 @@ createUser.post(
         
         const user = await users.createUser(username, (user) => {
             user.email = email
+
+            if (req.firstName)
+                user.firstName = req.firstName
+
+            if (req.lastName)
+                user.lastName = req.lastName
         })
 
         const result = await users.saveUser(user, password, c.env)
