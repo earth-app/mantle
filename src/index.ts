@@ -17,23 +17,6 @@ import Bindings from './bindings';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
-// Middleware
-if (packageJson.development) {
-    app.use('*', async (c, next) => {
-        const connInfo = getConnInfo(c)
-        if (!connInfo.remote.address) return await next() // Skip if local development
-
-        return await bearerAuth({
-            verifyToken: (token, c) => {
-                return token === c.env.DEVEOPMENT_TOKEN
-            },
-            headerName: 'X-Development-Token',
-            noAuthenticationHeaderMessage: "Mantle is currently in development mode. Please provide the development token.",
-            invalidTokenMessage: "Invalid development token provided."
-        })(c, next)
-    })
-}
-
 app.use(secureHeaders()) // Secure headers middleware
 app.use(logger()) // Logger middleware
 app.use(cors({ // CORS middleware
@@ -45,11 +28,6 @@ app.use(cors({ // CORS middleware
 app.use((c, next) => {
     c.res.headers.set('X-Earth-App-Version', packageJson.version)
     c.res.headers.set('X-Earth-App-Name', packageJson.name)
-
-    if (packageJson.development)
-        c.res.headers.set('X-Earth-App-Environment', 'development')
-    else
-        c.res.headers.set('X-Earth-App-Environment', 'production')
 
     return next()
 }) // Custom headers middleware
@@ -76,16 +54,12 @@ app.get(
             },
             servers: [
                 {
-                    url: "https://localhost:8787",
-                    description: "Local Server"
-                },
-                {
                     url: "https://api.earth-app.com",
                     description: "Production Server"
                 },
                 {
-                    url: "*-mantle.gmitch215.workers.dev",
-                    description: "Preview URLs"
+                    url: "https://localhost:8787",
+                    description: "Local Server"
                 }
             ],
             components: {
