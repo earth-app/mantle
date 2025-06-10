@@ -2,10 +2,18 @@ name = "earthapp-mantle"
 main = "src/index.ts"
 compatibility_date = "2025-04-28"
 assets = { directory = "public" }
+routes = [
+    { pattern = "api.earth-app.com", custom_domain = true }
+]
 
 [observability]
 enabled = true
 head_sampling_rate = 1
+
+[[d1_databases]]
+binding = "DB"
+database_name = "earth-app"
+database_id = "4c88abe1-6768-4f17-8cc6-8b8e41475a34"
 
 [[unsafe.bindings]]
 name = "ANONYMOUS_RATE_LIMIT"
@@ -18,25 +26,3 @@ name = "AUTH_RATE_LIMIT"
 type = "ratelimit"
 namespace_id = "2152"
 simple = { limit = 1000, period = 60 }
-
-[env.staging]
-name = "earthapp-mantle-staging"
-workers_dev = true
-routes = [
-    { pattern = "staging-api.earth-app.com", custom_domain = true }
-]
-
-[[d1_databases]]
-binding = "DB_STAGING"
-database_name = "earth-app-staging"
-database_id = "81b8931a-4a19-4841-9554-533d1a0b54f7"
-
-[env.production]
-routes = [
-    { pattern = "api.earth-app.com", custom_domain = true }
-]
-
-[[d1_databases]]
-binding = "DB_PRODUCTION"
-database_name = "earth-app-production"
-database_id = "ebd65d40-8331-4a26-98be-cb44b02d5e97"
