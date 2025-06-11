@@ -4,15 +4,15 @@
     "": {
       "name": "mantle",
       "dependencies": {
-        "@cloudflare/workers-types": "^4.20250607.0",
-        "@earth-app/ocean": "1.0.0-683056b",
+        "@cloudflare/workers-types": "^4.20250610.0",
+        "@earth-app/ocean": "1.0.0-cf082b6",
         "@hono-rate-limiter/cloudflare": "^0.2.2",
         "@hono/swagger-ui": "^0.5.2",
         "@hono/zod-validator": "^0.7.0",
         "hono": "^4.7.11",
         "hono-openapi": "^0.4.8",
         "hono-rate-limiter": "^0.4.2",
-        "zod": "^3.25.56",
+        "zod": "^3.25.58",
         "zod-openapi": "^4.2.4",
         "zod-to-json-schema": "^3.24.5",
       },
@@ -38,11 +38,11 @@
 
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20250525.0", "", { "os": "win32", "cpu": "x64" }, "sha512-mwTj+9f3uIa4NEXR1cOa82PjLa6dbrb3J+KCVJFYIaq7e63VxEzOchCXS4tublT2pmOhmFqkgBMXrxozxNkR2Q=="],
 
-    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250607.0", "", {}, "sha512-OYmKNzC2eQy6CNj+j0go8Ut3SezjsprCgJyEaBzJql+473WAN9ndVnNZy9lj/tTyLV6wzpQkZWmRAKGDmacvkg=="],
+    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250610.0", "", {}, "sha512-HxnUoey3QxCEfy07pUm7J42jBi9YPHq/hA3fw6JmOqYLHdviHI28OA8lup+2RUaHwDzh6q1DSfrBvvDqde645A=="],
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
 
-    "@earth-app/ocean": ["@earth-app/ocean@1.0.0-683056b", "https://npm.pkg.github.com/download/@earth-app/ocean/1.0.0-683056b/e2fcbeebcd47b0589c2103d0da2545d7f093d5de", { "dependencies": { "ws": "8.18.0" } }, "sha512-vbkYASrdouGB6jPmNgbhOEEUmgmefohqF9ou58sNOxsvft5Wb5uSKyc/+tC4tlk0FhADiPHflTWnErw1SpeAsQ=="],
+    "@earth-app/ocean": ["@earth-app/ocean@1.0.0-cf082b6", "https://npm.pkg.github.com/download/@earth-app/ocean/1.0.0-cf082b6/bdd16e70b6b365dd3fa7668d7aa812309de59216", { "dependencies": { "ws": "8.18.0" } }, "sha512-ue4nBW08zjylk8bu9BCjAGcndWbnqJApGpDRdiDwM0OkYDt6IRpth7CLC6UX/X83cMnlb6jFeseXZcwG5oCnyA=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.4.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-pBPWdu6MLKROBX05wSNKcNb++m5Er+KQ9QkB+WVM+pW2Kx9hoSrVTnu3BdkI5eBLZoKu/J6mW/B6i6bJB2ytXQ=="],
 
@@ -248,7 +248,7 @@
 
     "youch": ["youch@3.3.4", "", { "dependencies": { "cookie": "^0.7.1", "mustache": "^4.2.0", "stacktracey": "^2.1.8" } }, "sha512-UeVBXie8cA35DS6+nBkls68xaBBXCye0CNznrhszZjTbRVnJKQuNsyLKBTTL4ln1o1rh2PKtv35twV7irj5SEg=="],
 
-    "zod": ["zod@3.25.56", "", {}, "sha512-rd6eEF3BTNvQnR2e2wwolfTmUTnp70aUTqr0oaGbHifzC3BKJsoV+Gat8vxUMR1hwOKBs6El+qWehrHbCpW6SQ=="],
+    "zod": ["zod@3.25.58", "", {}, "sha512-DVLmMQzSZwNYzQoMaM3MQWnxr2eq+AtM9Hx3w1/Yl0pH8sLTSjN4jGP7w6f7uand6Hw44tsnSu1hz1AOA6qI2Q=="],
 
     "zod-openapi": ["zod-openapi@4.2.4", "", { "peerDependencies": { "zod": "^3.21.4" } }, "sha512-tsrQpbpqFCXqVXUzi3TPwFhuMtLN3oNZobOtYnK6/5VkXsNdnIgyNr4r8no4wmYluaxzN3F7iS+8xCW8BmMQ8g=="],
 
