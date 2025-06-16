@@ -12,7 +12,6 @@ import { rateLimit } from './util/ratelimit';
 
 import * as packageJson from '../package.json'
 import Bindings from './bindings';
-import { buildSummaries } from './cron/summary';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -90,10 +89,4 @@ app.get(
     })
 )
 
-export default {
-    fetch: app.fetch,
-    
-    async scheduled(controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
-        await buildSummaries(controller, env, ctx)
-    }
-}
+export default app

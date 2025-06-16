@@ -10,9 +10,6 @@ routes = [
 enabled = true
 head_sampling_rate = 1
 
-[triggers]
-
-
 [[d1_databases]]
 binding = "DB"
 database_name = "earth-app"
