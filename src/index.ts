@@ -11,9 +11,8 @@ import routes from './routes'
 import { rateLimit } from './util/ratelimit';
 
 import * as packageJson from '../package.json'
-import { bearerAuth } from 'hono/bearer-auth';
-import { getConnInfo } from 'hono/cloudflare-workers';
 import Bindings from './bindings';
+import { buildSummaries } from './cron/summary';
 
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -91,4 +90,10 @@ app.get(
     })
 )
 
-export default app
+export default {
+    fetch: app.fetch,
+    
+    async scheduled(controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
+        await buildSummaries(controller, env, ctx)
+    }
+}
