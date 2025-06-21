@@ -1,11 +1,10 @@
-import { Ai, D1Database, KVNamespace } from "@cloudflare/workers-types"
+import { D1Database, KVNamespace } from "@cloudflare/workers-types"
 
 type Bindings = {
     DB: D1Database
     earth_app: KVNamespace
     ANONYMOUS_RATE_LIMIT: any
     AUTH_RATE_LIMIT: any
-    AI: Ai
 
     // Secrets
     KEK: string
