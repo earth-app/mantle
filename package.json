@@ -4,12 +4,12 @@
   "version": "1.0.0",
   "description": "Backend API for The Earth App",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy --minify"
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20250610.0",
-    "@earth-app/ocean": "1.0.0-fdcb802",
+    "@earth-app/ocean": "1.0.0-cf082b6",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-validator": "^0.7.0",
