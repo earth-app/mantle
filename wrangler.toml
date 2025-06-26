@@ -1,6 +1,7 @@
 name = "earthapp-mantle"
 main = "src/index.ts"
 compatibility_date = "2025-04-28"
+compatibility_flags = [ "nodejs_compat"]
 assets = { directory = "public" }
 routes = [
     { pattern = "api.earth-app.com", custom_domain = true }
