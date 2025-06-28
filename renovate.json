@@ -26,7 +26,7 @@
       "datasourceTemplate": "git-refs",
       "versioningTemplate": "git",
       "currentValueTemplate": "master",
-      "extractVersionTemplate": "1.0.0-{{digest}}"
+      "extractVersionTemplate": "1.0.0-{{digestShort}}"
     }
   ],
   "hostRules": [
