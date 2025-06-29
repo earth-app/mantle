@@ -11,6 +11,7 @@ import Bindings from "../../bindings";
 import { deleteUser, getUserById, patchUser } from "../../util/users";
 import { bearerAuthMiddleware, getOwnerOfToken } from "../../util/authentication";
 import { UserObject } from "../../types/users";
+import { com } from "@earth-app/ocean";
 
 const user = new Hono<{ Bindings: Bindings }>()
 
@@ -168,7 +169,7 @@ user.patch(
             }, 400)
         }
 
-        const data = await c.req.json()
+        let data: Partial<com.earthapp.account.Account> = await c.req.json()
         if (!data || typeof data !== 'object') {
             return c.json({
                 code: 400,
@@ -221,10 +222,11 @@ user.patch(
         }
 
         if (data.type || data.id) {
-            return c.json({
-                code: 400,
-                message: "Cannot update read-only fields"
-            }, 400)
+            data = {
+                ...data,
+                type: undefined, // Prevent type changes
+                id: undefined // Prevent ID changes
+            }
         }
 
         // Update user properties
