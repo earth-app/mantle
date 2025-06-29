@@ -28,12 +28,15 @@ export type UserObject = {
 export type User = {
     id: string;
     username: string;
+    fullName?: string;
     created_at: Date;
     updated_at?: Date;
     last_login?: Date;
     account: {
         type: string;
         id: string;
+        firstName?: string;
+        lastName?: string;
         username: string;
         email?: string;
         address?: string | null;
@@ -56,9 +59,12 @@ export type User = {
  * @returns A User object.
  */
 export function toUser(data: ocean.com.earthapp.account.Account, created_at: Date = new Date(), updated_at: Date = new Date(), last_login: Date = new Date()): User {
+    const fullName = data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : undefined;
+
     return {
         id: data.id,
         username: data.username,
+        fullName: fullName,
         created_at: created_at,
         updated_at: updated_at,
         last_login: last_login,
