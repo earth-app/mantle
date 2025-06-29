@@ -272,8 +272,8 @@ export async function patchUser(account: ocean.com.earthapp.account.Account, dat
     let newAccount = account.deepCopy() as ocean.com.earthapp.account.Account
     newAccount = newAccount.patch(
         data.username ?? account.username,
-        data.firstName ?? account.firstName,
-        data.lastName ?? account.lastName,
+        (data.firstName ?? account.firstName) || 'John',
+        (data.lastName ?? account.lastName) || 'Doe',
         data.email ?? account.email,
         data.address ?? account.address,
         data.country ?? account.country,
@@ -288,7 +288,10 @@ export async function patchUser(account: ocean.com.earthapp.account.Account, dat
     }
 
     const userObject = await getUserById(account.id, bindings)
-    if (!userObject) throw new HTTPException(401, { message: 'User not found' })
+    if (!userObject) {
+        console.error(`User with ID ${account.id} not found`)
+        throw new HTTPException(401, { message: 'User not found' })
+    }
     
     userObject.account = newAccount
     await updateUser(userObject, bindings)
