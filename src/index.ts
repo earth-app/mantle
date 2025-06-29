@@ -30,7 +30,7 @@ app.use((c, next) => {
     return next()
 }) // Custom headers middleware
 
-app.use('/v1/*', cache({ // Cache middleware
+app.get('/v1/*', cache({ // Cache middleware
     cacheName: 'earth-app-cache',
     cacheControl: 'public, max-age=60, s-maxage=60',
     vary: ['Accept-Encoding', 'Authorization'],
