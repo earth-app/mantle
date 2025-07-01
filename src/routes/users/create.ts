@@ -8,7 +8,7 @@ import * as schemas from "../../openapi/schemas"
 import * as tags from "../../openapi/tags"
 
 import Bindings from "../../bindings"
-import * as users from "../../util/users"
+import * as users from "../../util/routes/users"
 
 const createUser = new Hono<{ Bindings: Bindings }>()
 

@@ -7,7 +7,7 @@ import * as encryption from './encryption'
 import * as util from "./util"
 import Bindings from '../bindings'
 import { Context } from 'hono'
-import { getUserById, getUserByUsername } from './users'
+import { getUserById, getUserByUsername } from './routes/users'
 
 type TokenRow = {
     id: number

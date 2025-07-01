@@ -11,7 +11,7 @@ import loginUser from './login'
 import createUser from './create'
 import user from './user'
 import { bearerAuthMiddleware } from "../../util/authentication"
-import { getUsers } from "../../util/users"
+import { getUsers } from "../../util/routes/users"
 import Bindings from "../../bindings"
 
 // Implementation

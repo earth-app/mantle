@@ -1,10 +1,10 @@
 import { D1Database } from '@cloudflare/workers-types'
 import * as ocean from '@earth-app/ocean'
-import * as encryption from './encryption'
-import * as util from "./util"
-import Bindings from '../bindings'
-import { UserObject, User, toUser, LoginUser } from '../types/users'
-import { addSession } from './authentication'
+import * as encryption from '../encryption'
+import * as util from "../util"
+import Bindings from '../../bindings'
+import { UserObject, toUser, LoginUser } from '../../types/users'
+import { addSession } from '../authentication'
 import { HTTPException } from 'hono/http-exception'
 
 // Helpers
@@ -78,21 +78,16 @@ async function checkTableExists(d1: D1Database) {
     await d1.prepare(query).run()
 
     // Indexes for performance
-    const idIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id)`
-    await d1.prepare(idIndexQuery).run()
-
-    const usernameIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username)`
-    await d1.prepare(usernameIndexQuery).run()
-
-    const lastLoginIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC)`
-    await d1.prepare(lastLoginIndexQuery).run()
-
-    const createdAtIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC)`
-    await d1.prepare(createdAtIndexQuery).run()
-
-    const updatedAtIndexQuery = `CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC)`
-    await d1.prepare(updatedAtIndexQuery).run()
+    await d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id)`).run()
+    await d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username)`).run()
+    await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC)`).run()
+    await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC)`).run()
+    await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC)`).run()
 }
+
+// User Functions
+
+// Save User Function
 
 export async function saveUser(user: ocean.com.earthapp.account.Account, password: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
@@ -153,7 +148,9 @@ export async function saveUser(user: ocean.com.earthapp.account.Account, passwor
     return await getUserById(user.id, bindings)
 }
 
-export async function updateUser(user: UserObject, bindings: Bindings) {
+// Update User Function
+
+async function updateUser(user: UserObject, bindings: Bindings) {
     await checkTableExists(bindings.DB)
 
     const usernameQuery = `UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`

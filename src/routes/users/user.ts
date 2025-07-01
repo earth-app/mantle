@@ -8,7 +8,7 @@ import * as schemas from "../../openapi/schemas"
 import * as tags from "../../openapi/tags"
 
 import Bindings from "../../bindings";
-import { deleteUser, getUserById, patchUser } from "../../util/users";
+import { deleteUser, getUserById, patchUser } from "../../util/routes/users";
 import { bearerAuthMiddleware, getOwnerOfToken } from "../../util/authentication";
 import { UserObject } from "../../types/users";
 import { com } from "@earth-app/ocean";
