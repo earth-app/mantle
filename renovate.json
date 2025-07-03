@@ -7,6 +7,11 @@
   "dependencyDashboard": false,
   "packageRules": [
     {
+      "matchDepNames": ["@earth-app/ocean"],
+      "matchDatasources": ["npm"],
+      "enabled": false
+    },
+    {
       "matchUpdateTypes": [
         "minor",
         "patch",
