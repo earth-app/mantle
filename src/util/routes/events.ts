@@ -1,8 +1,7 @@
 import { D1Database } from '@cloudflare/workers-types'
 import * as ocean from '@earth-app/ocean'
-import * as encryption from '../encryption'
-import * as util from "../util"
 import { EventObject, toEvent } from '../../types/users'
+import { haversineDistance } from '../util'
 
 // Database
 export type DBEvent = {
@@ -57,7 +56,7 @@ async function checkTableExists(d1: D1Database) {
     await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_endDate ON events(endDate)`).run()
 }
 
-async function findEvent(query: string, d1: D1Database, ...params: string[]): Promise<EventObject[]> {
+async function findEvent(query: string, d1: D1Database, ...params: any[]): Promise<EventObject[]> {
     await checkTableExists(d1)
 
     const row = await d1.prepare(query)
@@ -164,6 +163,50 @@ export async function deleteEvent(id: string, d1: D1Database): Promise<boolean> 
 
 // Event retrieval functions
 
+export async function getEvents(d1: D1Database, limit: number = 25, page: number = 0, search: string = ''): Promise<EventObject[]> {
+    await checkTableExists(d1)
+
+    const query = `SELECT * FROM events${search ? `WHERE name LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`
+    let results: EventObject[];
+    
+    if (search)
+        results = await findEvent(query, d1, limit, page * limit, `%${search}%`)
+    else
+        results = await findEvent(query, d1, limit, page * limit)
+
+    return results
+}
+
+export async function getEventsInside(d1: D1Database, latitude: number, longitude: number, radius: number, limit: number = 25, page: number = 0): Promise<EventObject[]> {
+    await checkTableExists(d1)
+
+    const latRange = radius / 111.32 // roughly 1 degree latitude = 111.32 km
+    const lonRange = radius / (111.32 * Math.cos(latitude * Math.PI / 180))
+    
+    const boundingBoxQuery = `SELECT * FROM events WHERE 
+        latitude IS NOT NULL AND longitude IS NOT NULL AND
+        latitude BETWEEN ? AND ? AND
+        longitude BETWEEN ? AND ? LIMIT ? OFFSET ?`
+    
+    const candidateResults = await findEvent(boundingBoxQuery, d1, 
+        latitude - latRange, latitude + latRange,
+        longitude - lonRange, longitude + lonRange,
+        limit, page * limit
+    )
+    
+    if (candidateResults.length === 0) return []
+
+    const filteredResults = candidateResults.filter(event => {
+        const { latitude: eventLat, longitude: eventLon } = event.database
+        if (eventLat == null || eventLon == null) return false
+        
+        const distance = haversineDistance(latitude, longitude, eventLat, eventLon)
+        return distance <= radius
+    })
+
+    return filteredResults
+}
+
 export async function doesEventExist(id: string, d1: D1Database): Promise<boolean> {
     await checkTableExists(d1)
 
@@ -176,24 +219,24 @@ export async function doesEventExist(id: string, d1: D1Database): Promise<boolea
 export async function getEventById(id: string, d1: D1Database): Promise<EventObject | null> {
     await checkTableExists(d1)
 
-    const results = await findEvent('SELECT * FROM events WHERE id = ?', d1, id)
+    const results = await findEvent('SELECT * FROM events WHERE id = ? LIMIT 1', d1, id)
     if (results.length === 0) return null
 
     return results[0]
 }
 
-export async function getEventsByHostId(hostId: string, d1: D1Database): Promise<EventObject[]> {
+export async function getEventsByHostId(hostId: string, d1: D1Database, limit: number = 25, page: number = 0): Promise<EventObject[]> {
     await checkTableExists(d1)
 
-    const query = 'SELECT * FROM events WHERE hostId = ?'
-    return await findEvent(query, d1, hostId)
+    const query = 'SELECT * FROM events WHERE hostId = ? LIMIT ? OFFSET ?'
+    return await findEvent(query, d1, hostId, limit, page * limit)
 }
 
-export async function getEventsByAttendees(attendees: string[], d1: D1Database): Promise<EventObject[]> {
+export async function getEventsByAttendees(attendees: string[], d1: D1Database, limit: number = 25, page: number = 0): Promise<EventObject[]> {
     await checkTableExists(d1)
 
-    const query = 'SELECT * FROM events WHERE attendees IS NOT NULL AND JSON_EXTRACT(attendees, ?) IS NOT NULL'
-    const results = await findEvent(query, d1, `$.${attendees.join(',$.')}`)
+    const query = 'SELECT * FROM events WHERE attendees IS NOT NULL AND JSON_EXTRACT(attendees, ?) IS NOT NULL LIMIT ? OFFSET ?'
+    const results = await findEvent(query, d1, `$.${attendees.join(',$.')}`, limit, page * limit)
     if (results.length === 0) return []
 
     // Verify attendees against the event's attendees

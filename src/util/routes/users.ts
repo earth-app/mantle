@@ -215,22 +215,29 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 
 export async function getUserById(id: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
-    const results = await findUser("SELECT * FROM users WHERE id = ?", id, bindings)
+    const results = await findUser("SELECT * FROM users WHERE id = ? LIMIT 1", id, bindings)
     return results.length ? results[0] : null
 }
 
 export async function getUserByUsername(username: string, bindings: Bindings) {
     await checkTableExists(bindings.DB)
-    const results = await findUser("SELECT * FROM users WHERE username = ?", username, bindings)
+    const results = await findUser("SELECT * FROM users WHERE username = ? LIMIT 1", username, bindings)
     return results.length ? results[0] : null
 }
 
-export async function getUsers(bindings: Bindings, limit: number = 25, page: number = 0) {
+export async function getUsers(bindings: Bindings, limit: number = 25, page: number = 0, search: string = '') {
     await checkTableExists(bindings.DB)
-    const query = `SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?`
-    const results = await bindings.DB.prepare(query)
-        .bind(limit, page * limit)
-        .all<DBUser>()
+    const query = `SELECT * FROM users${search ? ` WHERE username LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+
+    const statement = bindings.DB.prepare(query)
+    let results: D1Result<DBUser>
+    if (search) 
+        results = await statement.bind(`%${search}%`, limit, page * limit).all<DBUser>()
+    else
+        results = await statement.bind(limit, page * limit).all<DBUser>()
+
+    if (!results || results.error)
+        throw new HTTPException(400, { message: `Database error: ${results.error}` })
 
     return Promise.all(results.results.map(async (row) => await toUserObject(row, bindings)))
 }
