@@ -1,8 +1,9 @@
 import z from "zod"
 import "zod-openapi/extend"
-
-import { Event, LoginUser, User } from "../types/users"
 import { resolver } from "hono-openapi/zod"
+
+import { LoginUser, User } from "../types/users"
+import { Event } from "../types/events"
 
 // Root Types
 export function error(code: number, message: string) {

@@ -1,6 +1,6 @@
 import { D1Database } from '@cloudflare/workers-types'
 import * as ocean from '@earth-app/ocean'
-import { EventObject, toEvent } from '../../types/users'
+import { EventObject, toEvent } from '../../types/events'
 import { haversineDistance } from '../util'
 
 // Database
