@@ -1,28 +1,24 @@
 import { Hono } from "hono"
+import * as ocean from "@earth-app/ocean"
 
 import { describeRoute } from "hono-openapi"
 import { resolver } from "hono-openapi/zod"
 import * as schemas from "../../openapi/schemas"
 import * as tags from "../../openapi/tags"
 
-
-// User Routes
-import loginUser from './login'
-import createUser from './create'
-import user from './user'
+// Event Routes
 
 // Implementation
-import { bearerAuthMiddleware } from "../../util/authentication"
-import { getUsers } from "../../util/routes/users"
 import Bindings from "../../bindings"
+import { getEvents } from "../../util/routes/events"
 
-const users = new Hono<{ Bindings: Bindings }>()
+const events = new Hono<{ Bindings: Bindings }>()
 
-users.get(
+events.get(
     '/',
     describeRoute({
-        summary: "Retrieve a paginated list of all users",
-        description: "Gets a paginated list of all users in the Earth App.",
+        summary: "Retrieve a paginated list of all events",
+        description: "Gets a paginated list of all events in the Earth App.",
         parameters: [
             {
                 name: 'page',
@@ -50,7 +46,7 @@ users.get(
             {
                 name: 'search',
                 in: 'query',
-                description: 'Search query for usernames (max 40 characters)',
+                description: 'Search query for event names (max 40 characters)',
                 required: false,
                 schema: {
                     type: 'string',
@@ -61,22 +57,22 @@ users.get(
         ],
         responses: {
             200: {
-                description: "List of users",
+                description: "List of events",
                 content: {
                     'application/json': {
-                        schema: resolver(schemas.paginated(schemas.user)),
+                        schema: resolver(schemas.paginated(schemas.event)),
                     }
                 }
             },
             400: schemas.badRequest
         },
-        tags: [tags.USERS]
+        tags: [tags.EVENTS]
     }),
     async (c) => {
         const page = c.req.query('page') ? parseInt(c.req.query('page')!) : 1
         const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 25
         const search = c.req.query('search') || ''
-
+        
         if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
             return c.json({
                 code: 400,
@@ -98,23 +94,14 @@ users.get(
             }, 400)
         }
 
-        const users = (await getUsers(c.env, limit, page - 1, search)).map(user => user.public)
+        const events = await getEvents(c.env.DB, limit, page - 1)
         return c.json({
             page: page,
             limit: limit,
-            total: users.length,
-            items: users
+            total: events.length,
+            items: events.map(event => event.public)
         }, 200)
     }
 )
 
-users.route('/login', loginUser)
-
-users.route('/create', createUser)
-
-users.route('/current', user)
-users.use('/current', bearerAuthMiddleware())
-
-users.route('/:id', user)
-
-export default users
+export default events
