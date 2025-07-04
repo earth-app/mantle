@@ -1,6 +1,6 @@
-import * as ocean from '@earth-app/ocean'
-import { DBUser } from '../util/routes/users'
-import { DBEvent } from '../util/routes/events'
+import * as ocean from '@earth-app/ocean';
+import { DBUser } from '../util/routes/users';
+import { DBEvent } from '../util/routes/events';
 
 // Users
 
@@ -9,49 +9,49 @@ import { DBEvent } from '../util/routes/events'
  * Contains user details and associated account data.
  */
 export type UserObject = {
-    /**
-     * The user object containing user details.
-     */
-    public: User
-    /**
-     * The database user object.
-     */
-    database: DBUser
-    /**
-     * The account object associated with the user.
-     * This is an instance of ocean.com.earthapp.account.Account.
-     */
-    account: ocean.com.earthapp.account.Account
-}
+	/**
+	 * The user object containing user details.
+	 */
+	public: User;
+	/**
+	 * The database user object.
+	 */
+	database: DBUser;
+	/**
+	 * The account object associated with the user.
+	 * This is an instance of ocean.com.earthapp.account.Account.
+	 */
+	account: ocean.com.earthapp.account.Account;
+};
 
 /**
  * User type representing a user in the Earth App system.
  * Contains user details such as ID, username, creation date, and associated account.
  */
 export type User = {
-    id: string;
-    username: string;
-    fullName?: string;
-    created_at: Date;
-    updated_at?: Date;
-    last_login?: Date;
-    account: {
-        type: string;
-        id: string;
-        firstName?: string;
-        lastName?: string;
-        username: string;
-        email?: string;
-        address?: string | null;
-        country?: string;
-        phoneNumber?: number;
-        activities?: {
-            id: string;
-            name: string;
-            type: typeof ocean.com.earthapp.activity.ActivityType.prototype.name;
-        }[]
-    }
-}
+	id: string;
+	username: string;
+	fullName?: string;
+	created_at: Date;
+	updated_at?: Date;
+	last_login?: Date;
+	account: {
+		type: string;
+		id: string;
+		firstName?: string;
+		lastName?: string;
+		username: string;
+		email?: string;
+		address?: string | null;
+		country?: string;
+		phoneNumber?: number;
+		activities?: {
+			id: string;
+			name: string;
+			type: typeof ocean.com.earthapp.activity.ActivityType.prototype.name;
+		}[];
+	};
+};
 
 /**
  * Converts an Account object to a User object.
@@ -61,18 +61,23 @@ export type User = {
  * @param last_login The last login date of the user (default is current date).
  * @returns A User object.
  */
-export function toUser(data: ocean.com.earthapp.account.Account, created_at: Date = new Date(), updated_at: Date = new Date(), last_login: Date = new Date()): User {
-    const fullName = data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : undefined;
+export function toUser(
+	data: ocean.com.earthapp.account.Account,
+	created_at: Date = new Date(),
+	updated_at: Date = new Date(),
+	last_login: Date = new Date()
+): User {
+	const fullName = data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : undefined;
 
-    return {
-        id: data.id,
-        username: data.username,
-        fullName: fullName,
-        created_at: created_at,
-        updated_at: updated_at,
-        last_login: last_login,
-        account: JSON.parse(data.toJson()),
-    }
+	return {
+		id: data.id,
+		username: data.username,
+		fullName: fullName,
+		created_at: created_at,
+		updated_at: updated_at,
+		last_login: last_login,
+		account: JSON.parse(data.toJson())
+	};
 }
 
 /**
@@ -80,7 +85,7 @@ export function toUser(data: ocean.com.earthapp.account.Account, created_at: Dat
  * Contains user ID, username, and session token.
  */
 export type LoginUser = {
-    id: string;
-    username: string;
-    session_token: string;
-}
+	id: string;
+	username: string;
+	session_token: string;
+};

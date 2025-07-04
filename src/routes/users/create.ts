@@ -1,87 +1,97 @@
-import { Hono } from "hono"
+import { Hono } from 'hono';
 
-import { describeRoute } from "hono-openapi"
-import { resolver } from "hono-openapi/zod"
-import type { OpenAPIV3 } from "openapi-types"
-import zodToJsonSchema from "zod-to-json-schema"
-import * as schemas from "../../openapi/schemas"
-import * as tags from "../../openapi/tags"
+import { describeRoute } from 'hono-openapi';
+import { resolver } from 'hono-openapi/zod';
+import type { OpenAPIV3 } from 'openapi-types';
+import zodToJsonSchema from 'zod-to-json-schema';
+import * as schemas from '../../openapi/schemas';
+import * as tags from '../../openapi/tags';
 
-import Bindings from "../../bindings"
-import * as users from "../../util/routes/users"
+import Bindings from '../../bindings';
+import * as users from '../../util/routes/users';
 
-const createUser = new Hono<{ Bindings: Bindings }>()
+const createUser = new Hono<{ Bindings: Bindings }>();
 
 createUser.post(
-    '/',
-    describeRoute({
-        summary: "Create a new user",
-        description: "Creates a new user within the Earth App",
-        requestBody: {
-            description: "User object",
-            required: true,
-            content: {
-                'application/json': {
-                    schema: zodToJsonSchema(schemas.userCreate) as OpenAPIV3.SchemaObject
-                }
-            }
-        },
-        responses: {
-            201: {
-                description: "User created successfully",
-                content: {
-                    'application/json': {
-                        schema: resolver(schemas.user),
-                    }
-                }
-            },
-            400: schemas.badRequest
-        },
-        tags: [tags.USERS],
-    }),
-    async (c) => {
-        const req = await c.req.json()
-        const { username, email, password } = req
+	'/',
+	describeRoute({
+		summary: 'Create a new user',
+		description: 'Creates a new user within the Earth App',
+		requestBody: {
+			description: 'User object',
+			required: true,
+			content: {
+				'application/json': {
+					schema: zodToJsonSchema(schemas.userCreate) as OpenAPIV3.SchemaObject
+				}
+			}
+		},
+		responses: {
+			201: {
+				description: 'User created successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest
+		},
+		tags: [tags.USERS]
+	}),
+	async (c) => {
+		const req = await c.req.json();
+		const { username, email, password } = req;
 
-        if (!username || !email || !password)
-            return c.json({
-                code: 400,
-                message: "Missing required fields"
-            }, 400)
+		if (!username || !email || !password)
+			return c.json(
+				{
+					code: 400,
+					message: 'Missing required fields'
+				},
+				400
+			);
 
-        const usernameExists = await users.getUserByUsername(username, c.env)
-        if (usernameExists)
-            return c.json({
-                code: 400,
-                message: `Username ${username} already exists`
-            }, 400)
+		const usernameExists = await users.getUserByUsername(username, c.env);
+		if (usernameExists)
+			return c.json(
+				{
+					code: 400,
+					message: `Username ${username} already exists`
+				},
+				400
+			);
 
-        const emailExists = await users.getUserByEmail(email, c.env)
-        if (emailExists)
-            return c.json({
-                code: 400,
-                message: `Email ${email} is already registered`
-            }, 400)
-        
-        const user = await users.createUser(username, (user) => {
-            user.email = email
+		const emailExists = await users.getUserByEmail(email, c.env);
+		if (emailExists)
+			return c.json(
+				{
+					code: 400,
+					message: `Email ${email} is already registered`
+				},
+				400
+			);
 
-            if (req.firstName)
-                user.firstName = req.firstName
+		const user = await users.createUser(username, (user) => {
+			user.email = email;
 
-            if (req.lastName)
-                user.lastName = req.lastName
-        })
+			if (req.firstName) user.firstName = req.firstName;
 
-        const result = await users.saveUser(user, password, c.env)
-        if (!result)
-            return c.json({
-                code: 400,
-                message: "Failed to create user"
-            }, 400)
+			if (req.lastName) user.lastName = req.lastName;
+		});
 
-        return c.json(result.public, 201)
-    }
-)
+		const result = await users.saveUser(user, password, c.env);
+		if (!result)
+			return c.json(
+				{
+					code: 400,
+					message: 'Failed to create user'
+				},
+				400
+			);
 
-export default createUser
+		return c.json(result.public, 201);
+	}
+);
+
+export default createUser;
