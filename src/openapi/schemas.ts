@@ -1,7 +1,7 @@
 import z from "zod"
 import "zod-openapi/extend"
 
-import { LoginUser, User } from "../types/users"
+import { Event, LoginUser, User } from "../types/users"
 import { resolver } from "hono-openapi/zod"
 
 // Root Types
@@ -51,6 +51,15 @@ export const userUpdate = z.object({
 })
 
 /// Return Objects
+export function paginated(schema: z.ZodTypeAny) {
+    return z.object({
+        page: z.number().int().min(1).openapi({ example: 1 }),
+        limit: z.number().int().min(1).max(100).openapi({ example: 25 }),
+        total: z.number().int().min(0).openapi({ example: 100 }),
+        items: z.array(schema),
+    })
+}
+
 export const user = z.custom<User>().openapi({
     example: {
         id: "eb9137b1272938",
@@ -76,6 +85,24 @@ export const loginResponse = z.custom<LoginUser>().openapi({
         session_token: "abc123xyz456",
     }
 })
+
+export const event = z.custom<Event>().openapi({
+    example: {
+        id: "HmNzYBFjhiz9Mg0thJax3qIH",
+        hostId: "KiBTbkxOMAciG19c5EwE5zIv",
+        name: "Community Cleanup",
+        description: "Join us for a community cleanup event to help keep our neighborhood clean and green.",
+        date: new Date("2025-05-11T10:00:00Z"),
+        endDate: new Date("2025-05-11T14:00:00Z"),
+        location: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+        },
+        type: "IN_PERSON",
+        activities: ["HOBBY", "RELAXATION", "SOCIAL"],
+    }
+})
+export const events = z.array(event)
 
 // Reponse Schemas
 
