@@ -1,7 +1,7 @@
 import { bearerAuth } from 'hono/bearer-auth';
 import { basicAuth } from 'hono/basic-auth';
 import { D1Database } from '@cloudflare/workers-types';
-import * as ocean from '@earth-app/ocean';
+import { com } from '@earth-app/ocean';
 
 import * as encryption from './encryption';
 import * as util from './util';
@@ -61,8 +61,8 @@ async function hashToken(token: string, secret: Uint8Array): Promise<string> {
 
 export async function addToken(token: string, owner: string, bindings: Bindings, expiration: number = 30, is_session: boolean = false) {
 	if (!token || !owner) throw new Error('Token and owner are required');
-	if (token.length != ocean.com.earthapp.util.API_KEY_LENGTH)
-		throw new Error(`Token must be ${ocean.com.earthapp.util.API_KEY_LENGTH} characters long`);
+	if (token.length != com.earthapp.util.API_KEY_LENGTH)
+		throw new Error(`Token must be ${com.earthapp.util.API_KEY_LENGTH} characters long`);
 
 	const d1 = bindings.DB;
 	await checkTableExists(d1);
@@ -207,7 +207,7 @@ export async function validateSessions(owner: string, d1: D1Database) {
 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 export function generateSessionToken() {
 	let session = '';
-	for (let i = 0; i < ocean.com.earthapp.util.API_KEY_LENGTH; i++) {
+	for (let i = 0; i < com.earthapp.util.API_KEY_LENGTH; i++) {
 		const randomChar = chars.charAt(Math.floor(Math.random() * chars.length));
 		session += randomChar;
 	}
@@ -288,7 +288,7 @@ export async function bumpCurrentSession(owner: string, d1: D1Database) {
 export function bearerAuthMiddleware() {
 	return bearerAuth({
 		verifyToken: async (token: string, c: Context) => {
-			if (token.length !== ocean.com.earthapp.util.API_KEY_LENGTH) return false;
+			if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
 
 			if (token.startsWith('EA25')) return await isValidToken(token, c.env);
 
@@ -300,7 +300,7 @@ export function bearerAuthMiddleware() {
 export function adminMiddleware() {
 	return bearerAuth({
 		verifyToken: async (token: string, c: Context<{ Bindings: Bindings }>) => {
-			if (token.length !== ocean.com.earthapp.util.API_KEY_LENGTH) return false;
+			if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
 			return token === c.env.ADMIN_API_KEY;
 		}
 	});
