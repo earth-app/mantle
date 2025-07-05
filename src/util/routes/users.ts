@@ -223,7 +223,7 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>) {
 		if (token !== c.env.ADMIN_API_KEY) {
 			return {
 				data: null,
-				message: 'Forbidden: You do not have permission to view this user.',
+				message: 'Forbidden: You do not have permission to access this user.',
 				status: 403
 			};
 		}

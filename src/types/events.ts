@@ -36,7 +36,9 @@ export type Event = {
 		longitude: number;
 	};
 	date: Date;
-	endDate: Date;
+	end_date: Date;
+	created_at?: Date;
+	updated_at?: Date;
 };
 
 /**
@@ -44,7 +46,7 @@ export type Event = {
  * @param data The event data to convert.
  * @returns An Event object.
  */
-export function toEvent(data: com.earthapp.event.Event): Event {
+export function toEvent(data: com.earthapp.event.Event, created_at: Date = new Date(), updated_at: Date = new Date()): Event {
 	return {
 		id: data.id,
 		hostId: data.hostId,
@@ -59,6 +61,8 @@ export function toEvent(data: com.earthapp.event.Event): Event {
 				}
 			: undefined,
 		date: new Date(data.date),
-		endDate: new Date(data.endDate)
+		end_date: new Date(data.endDate),
+		created_at: created_at,
+		updated_at: updated_at
 	};
 }

@@ -16,6 +16,8 @@ export type DBEvent = {
 	latitude?: number;
 	longitude?: number;
 	date: Date;
+	created_at?: Date;
+	updated_at?: Date;
 };
 
 async function toEventObject(event: DBEvent): Promise<EventObject> {
@@ -37,7 +39,9 @@ async function checkTableExists(d1: D1Database) {
 		attendees TEXT NOT NULL,
         latitude DOUBLE,
         longitude DOUBLE,
-        date DATETIME NOT NULL
+        date DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`;
 	await d1.prepare(query).run();
 
@@ -113,6 +117,7 @@ export async function updateEvent(event: com.earthapp.event.Event, d1: D1Databas
         latitude = ?,
         longitude = ?,
         date = ?,
+        updated_at = CURRENT_TIMESTAMP,
         WHERE id = ?`;
 
 	await d1
