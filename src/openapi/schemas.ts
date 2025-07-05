@@ -43,7 +43,7 @@ export const activityType = z
 	.enum(com.earthapp.activity.ActivityType.values().map((v) => v.name) as [string, ...string[]])
 	.openapi({ example: 'HIKING' });
 
-export const userVisibility = z
+export const visibility = z
 	.enum(com.earthapp.Visibility.values().map((v) => v.name) as [string, ...string[]])
 	.openapi({ example: 'PUBLIC' });
 
@@ -82,7 +82,7 @@ export const userUpdate = z
 
 export const userFieldPrivacy = z
 	.object({
-		account: userVisibility,
+		account: visibility,
 		name: userPrivacy,
 		bio: userPrivacy,
 		email: userPrivacy,
@@ -108,6 +108,36 @@ export const userFieldPrivacy = z
 		}
 	});
 
+export const eventCreate = z
+	.object({
+		name: text,
+		description: text.optional(),
+		type: eventType,
+		location: z
+			.object({
+				latitude: z.number().openapi({ example: 37.7749 }),
+				longitude: z.number().openapi({ example: -122.4194 })
+			})
+			.optional(),
+		date: z.number().int().openapi({ example: 1736400000000 }),
+		end_date: z.number().int().optional().openapi({ example: 1736403600000 }),
+		visibility: visibility
+	})
+	.openapi({
+		example: {
+			name: 'Community Cleanup',
+			description: 'Join us for a community cleanup event in the park.',
+			type: 'IN_PERSON',
+			location: {
+				latitude: 37.7749,
+				longitude: -122.4194
+			},
+			date: 1736400000000,
+			end_date: 1736403600000,
+			visibility: 'PRIVATE'
+		}
+	});
+
 export const eventUpdate = z
 	.object({
 		hostId: id.optional(),
@@ -122,7 +152,8 @@ export const eventUpdate = z
 			})
 			.optional(),
 		date: date.optional(),
-		endDate: date.optional()
+		endDate: date.optional(),
+		visibility: visibility.optional()
 	})
 	.openapi({
 		example: {
@@ -226,7 +257,8 @@ export const event = z
 			longitude: z.number().openapi({ example: -122.4194 })
 		}),
 		date: date.openapi({ example: '2025-05-11T10:00:00Z' }),
-		endDate: date.openapi({ example: '2025-05-11T12:00:00Z' })
+		endDate: date.openapi({ example: '2025-05-11T12:00:00Z' }),
+		visibility: visibility
 	})
 	.openapi({
 		example: {
@@ -241,7 +273,8 @@ export const event = z
 				longitude: -122.4194
 			},
 			date: '2025-05-11T10:00:00Z',
-			endDate: '2025-05-11T12:00:00Z'
+			endDate: '2025-05-11T12:00:00Z',
+			visibility: 'PRIVATE'
 		}
 	});
 export const events = z.array(event);
