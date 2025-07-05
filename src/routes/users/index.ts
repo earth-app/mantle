@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
+import type { OpenAPIV3 } from 'openapi-types';
+import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
@@ -125,7 +127,279 @@ users.route('/create', createUser);
 
 users.route('/current', user);
 users.use('/current', bearerAuthMiddleware());
+users.get(
+	'/current',
+	describeRoute({
+		summary: 'Gets the current user',
+		description: 'Gets the user based on the provided Bearer token.',
+		security: [{ BearerAuth: [] }],
+		responses: {
+			200: {
+				description: 'User retrieved successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest
+		},
+		tags: [tags.USERS]
+	})
+);
+users.patch(
+	'/current',
+	describeRoute({
+		summary: 'Updates the current user',
+		description: 'Updates the user based on the provided Bearer token.',
+		security: [{ BearerAuth: [] }],
+		requestBody: {
+			description: 'User object partial',
+			required: true,
+			content: {
+				'application/json': {
+					schema: zodToJsonSchema(schemas.userUpdate) as OpenAPIV3.SchemaObject
+				}
+			}
+		},
+		responses: {
+			200: {
+				description: 'User updated successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest
+		},
+		tags: [tags.USERS]
+	})
+);
+users.delete(
+	'/current',
+	describeRoute({
+		summary: 'Deletes the current user',
+		description: 'Deletes the user based on the provided Bearer token.',
+		security: [{ BearerAuth: [] }],
+		responses: {
+			204: {
+				description: 'User deleted successfully'
+			},
+			400: schemas.badRequest
+		},
+		tags: [tags.USERS]
+	})
+);
 
 users.route('/:id', user);
+users.get(
+	'/:id',
+	describeRoute({
+		summary: 'Gets a user by ID',
+		description: 'Retrieves the user based on the provided User ID.',
+		parameters: [
+			{
+				name: 'id',
+				in: 'path',
+				required: true,
+				schema: {
+					type: 'string',
+					description: 'Unique identifier for the user',
+					example: 'eb9137b1272938'
+				}
+			}
+		],
+		responses: {
+			200: {
+				description: 'User found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'User not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.USERS]
+	})
+);
+users.patch(
+	'/:id',
+	describeRoute({
+		summary: 'Updates a user by ID',
+		description: 'Updates the user based on the provided User ID.',
+		security: [{ BearerAuth: [] }],
+		requestBody: {
+			description: 'User object partial',
+			required: true,
+			content: {
+				'application/json': {
+					schema: zodToJsonSchema(schemas.userUpdate) as OpenAPIV3.SchemaObject
+				}
+			}
+		},
+		responses: {
+			200: {
+				description: 'User updated successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'User not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.USERS]
+	})
+);
+users.delete(
+	'/:id',
+	describeRoute({
+		summary: 'Deletes a user by ID',
+		description: 'Deletes the user based on the provided User ID.',
+		security: [{ BearerAuth: [] }],
+		responses: {
+			204: {
+				description: 'User deleted successfully'
+			},
+			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'User not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.USERS]
+	})
+);
+
+users.route('/:username', user);
+users.get(
+	'/:username',
+	describeRoute({
+		summary: 'Gets a user by username',
+		description: 'Retrieves the user based on the provided username. The username should begin with "@"',
+		parameters: [
+			{
+				name: 'username',
+				in: 'path',
+				required: true,
+				schema: {
+					type: 'string',
+					description: 'Username of the user, beginning with "@"',
+					example: '@john_doe'
+				}
+			}
+		],
+		responses: {
+			200: {
+				description: 'User found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'User not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.USERS]
+	})
+);
+users.patch(
+	'/:username',
+	describeRoute({
+		summary: 'Updates a user by username',
+		description: 'Updates the user based on the provided username. The username should begin with "@"',
+		security: [{ BearerAuth: [] }],
+		requestBody: {
+			description: 'User object partial',
+			required: true,
+			content: {
+				'application/json': {
+					schema: zodToJsonSchema(schemas.userUpdate) as OpenAPIV3.SchemaObject
+				}
+			}
+		},
+		responses: {
+			200: {
+				description: 'User updated successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'User not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.USERS]
+	})
+);
+users.delete(
+	'/:username',
+	describeRoute({
+		summary: 'Deletes a user by username',
+		description: 'Deletes the user based on the provided username. The username should begin with "@"',
+		security: [{ BearerAuth: [] }],
+		responses: {
+			204: {
+				description: 'User deleted successfully'
+			},
+			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'User not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.USERS]
+	})
+);
 
 export default users;
