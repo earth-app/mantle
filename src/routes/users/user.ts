@@ -79,7 +79,7 @@ user.get('/', async (c) => {
 			}
 			break;
 		}
-		// Private - Admin only
+		// Private - Admin & Friends only
 		case 'private': {
 			if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
 				return c.json(
