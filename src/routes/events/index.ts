@@ -6,12 +6,14 @@ import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
 // Event Routes
+import createEvent from './create';
 import event from './event';
 import currentEvent from './current';
 
 // Implementation
 import Bindings from '../../bindings';
 import { getEvents } from '../../util/routes/events';
+import { bearerAuthMiddleware } from '../../util/authentication';
 
 const events = new Hono<{ Bindings: Bindings }>();
 
@@ -117,7 +119,12 @@ events.get(
 	}
 );
 
-events.route('/current', currentEvent);
+events.use('/create', bearerAuthMiddleware());
+events.route('/create', createEvent);
+
 events.route('/:eventId', event);
+
+events.use('/current', bearerAuthMiddleware());
+events.route('/current', currentEvent);
 
 export default events;

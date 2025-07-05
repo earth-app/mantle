@@ -7,7 +7,6 @@ import * as tags from '../../openapi/tags';
 
 import Bindings from '../../bindings';
 import { bearerAuthMiddleware, getOwnerOfToken } from '../../util/authentication';
-import { getUserFromContext } from '../../util/routes/users';
 import { getEventsByAttendees } from '../../util/routes/events';
 
 const currentEvent = new Hono<{ Bindings: Bindings }>();
