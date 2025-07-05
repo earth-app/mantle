@@ -51,6 +51,10 @@ export const userPrivacy = z
 	.enum(com.earthapp.account.Privacy.values().map((v) => v.name) as [string, ...string[]])
 	.openapi({ example: 'MUTUAL' });
 
+export const eventType = z
+	.enum(com.earthapp.event.EventType.values().map((v) => v.name) as [string, ...string[]])
+	.openapi({ example: 'IN_PERSON' });
+
 // Objects
 
 /// Request Objects
@@ -101,6 +105,38 @@ export const userFieldPrivacy = z
 			friends: 'MUTUAL',
 			last_login: 'CIRCLE',
 			account_type: 'PUBLIC'
+		}
+	});
+
+export const eventUpdate = z
+	.object({
+		hostId: id.optional(),
+		name: text.optional(),
+		description: text.optional(),
+		type: eventType,
+		activities: z.array(activityType).optional(),
+		location: z
+			.object({
+				latitude: z.number().openapi({ example: 37.7749 }),
+				longitude: z.number().openapi({ example: -122.4194 })
+			})
+			.optional(),
+		date: date.optional(),
+		endDate: date.optional()
+	})
+	.openapi({
+		example: {
+			hostId: 'eb9137b1272938',
+			name: 'Community Cleanup',
+			description: 'Join us for a community cleanup event in the park.',
+			type: 'IN_PERSON',
+			activities: ['HOBBY', 'SPORT'],
+			location: {
+				latitude: 37.7749,
+				longitude: -122.4194
+			},
+			date: '2025-05-11T10:00:00Z',
+			endDate: '2025-05-11T12:00:00Z'
 		}
 	});
 
@@ -174,10 +210,6 @@ export const loginResponse = z.custom<LoginUser>().openapi({
 		session_token: 'abc123xyz456'
 	}
 });
-
-export const eventType = z
-	.enum(com.earthapp.event.EventType.values().map((v) => v.name) as [string, ...string[]])
-	.openapi({ example: 'IN_PERSON' });
 
 export const event = z
 	.object({
