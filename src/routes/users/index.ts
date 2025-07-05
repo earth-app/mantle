@@ -122,10 +122,8 @@ users.get(
 );
 
 users.route('/login', loginUser);
-
 users.route('/create', createUser);
 
-users.route('/current', user);
 users.use('/current', bearerAuthMiddleware());
 users.get(
 	'/current',
@@ -191,8 +189,8 @@ users.delete(
 		tags: [tags.USERS]
 	})
 );
+users.route('/current', user);
 
-users.route('/:id', user);
 users.get(
 	'/:id',
 	describeRoute({
@@ -296,8 +294,8 @@ users.delete(
 		tags: [tags.USERS]
 	})
 );
+users.route('/:id', user);
 
-users.route('/:username', user);
 users.get(
 	'/:username',
 	describeRoute({
@@ -401,5 +399,6 @@ users.delete(
 		tags: [tags.USERS]
 	})
 );
+users.route('/:username', user);
 
 export default users;

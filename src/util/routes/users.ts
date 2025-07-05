@@ -1,18 +1,21 @@
 import { D1Database } from '@cloudflare/workers-types';
-import * as ocean from '@earth-app/ocean';
 import * as encryption from '../encryption';
 import * as util from '../util';
 import Bindings from '../../bindings';
 import { UserObject, toUser, LoginUser } from '../../types/users';
-import { addSession } from '../authentication';
+import { addSession, getOwnerOfToken } from '../authentication';
 import { HTTPException } from 'hono/http-exception';
+
+import { com } from '@earth-app/ocean';
+import * as ocean from '@earth-app/ocean';
+import { Context } from 'hono';
 
 // Helpers
 
-export async function createUser(username: string, callback: (user: ocean.com.earthapp.account.Account) => void) {
+export async function createUser(username: string, callback: (user: com.earthapp.account.Account) => void) {
 	try {
-		const id = ocean.com.earthapp.account.Account.newId();
-		const user = new ocean.com.earthapp.account.Account(id, username);
+		const id = com.earthapp.account.Account.newId();
+		const user = new com.earthapp.account.Account(id, username);
 		callback(user);
 
 		return user;
@@ -35,7 +38,7 @@ export type DBUser = {
 	updated_at?: Date;
 };
 
-async function toUserObject(row: DBUser, bindings: Bindings): Promise<UserObject> {
+async function toUserObject(row: DBUser, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings): Promise<UserObject> {
 	const { binary, encryption_key, encryption_iv } = row;
 	if (!binary || !encryption_key || !encryption_iv) throw new HTTPException(500, { message: 'Missing required fields for decryption' });
 
@@ -48,9 +51,9 @@ async function toUserObject(row: DBUser, bindings: Bindings): Promise<UserObject
 
 	const decryptedData = await encryption.decryptData(decryptedKey, util.fromBase64(encryption_iv), binary0);
 
-	const accountData = ocean.fromBinary(new Int8Array(decryptedData)) as ocean.com.earthapp.account.Account;
+	const accountData = ocean.fromBinary(new Int8Array(decryptedData)) as com.earthapp.account.Account;
 
-	return { public: toUser(accountData, row.created_at, row.updated_at, row.last_login), database: row, account: accountData };
+	return { public: toUser(accountData, fieldPrivacy, row.created_at, row.updated_at, row.last_login), database: row, account: accountData };
 }
 
 async function checkTableExists(d1: D1Database) {
@@ -80,7 +83,7 @@ async function checkTableExists(d1: D1Database) {
 
 // Save User Function
 
-export async function saveUser(user: ocean.com.earthapp.account.Account, password: string, bindings: Bindings) {
+export async function saveUser(user: com.earthapp.account.Account, password: string, bindings: Bindings) {
 	await checkTableExists(bindings.DB);
 
 	if (password.length < 8 || password.length > 100)
@@ -161,10 +164,12 @@ async function updateUser(user: UserObject, bindings: Bindings) {
 	await bindings.DB.prepare(updateBinaryQuery).bind(encryptedData, user.database.id).run();
 }
 
-async function findUser(query: string, param: string, bindings: Bindings) {
-	const result = await bindings.DB.prepare(query).bind(param).all<DBUser>();
+async function findUser(query: string, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings, ...params: any[]) {
+	const result = await bindings.DB.prepare(query)
+		.bind(...params)
+		.all<DBUser>();
 
-	return await Promise.all(result.results.map(async (row) => await toUserObject(row, bindings)));
+	return await Promise.all(result.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
 
 // Login Function
@@ -192,21 +197,91 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 	};
 }
 
+// Routing utilities
+
+export async function getUserFromContext(c: Context<{ Bindings: Bindings }>) {
+	const bearerToken = c.req.header('Authorization');
+	if (!bearerToken || !bearerToken.startsWith('Bearer ')) {
+		return { data: null, message: 'Unauthorized', status: 401 };
+	}
+
+	const token = bearerToken.slice(7);
+	const path = c.req.param('id');
+	let user: UserObject | null;
+
+	// Current User
+	if (!path) {
+		user = await getOwnerOfToken(token, c.env);
+		if (!user) {
+			return {
+				data: null,
+				message: 'Unauthorized: Invalid token',
+				status: 401
+			};
+		}
+	} else {
+		if (token !== c.env.ADMIN_API_KEY) {
+			return {
+				data: null,
+				message: 'Forbidden: You do not have permission to view this user.',
+				status: 403
+			};
+		}
+
+		if (path.startsWith('@')) {
+			// By Username
+			const username = path.slice(1);
+			user = await getUserByUsername(username, c.env);
+		} else {
+			// By ID
+			user = await getUserById(path, c.env);
+		}
+	}
+
+	if (!user) {
+		return {
+			data: null,
+			message: 'User not found',
+			status: 404
+		};
+	}
+
+	return {
+		data: user,
+		message: 'User found',
+		status: 200
+	};
+}
+
 // User retrieval functions
 
-export async function getUserById(id: string, bindings: Bindings) {
+export async function getUserById(
+	id: string,
+	bindings: Bindings,
+	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
+) {
 	await checkTableExists(bindings.DB);
-	const results = await findUser('SELECT * FROM users WHERE id = ? LIMIT 1', id, bindings);
+	const results = await findUser('SELECT * FROM users WHERE id = ? LIMIT 1', fieldPrivacy, bindings, id);
 	return results.length ? results[0] : null;
 }
 
-export async function getUserByUsername(username: string, bindings: Bindings) {
+export async function getUserByUsername(
+	username: string,
+	bindings: Bindings,
+	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
+) {
 	await checkTableExists(bindings.DB);
-	const results = await findUser('SELECT * FROM users WHERE username = ? LIMIT 1', username, bindings);
+	const results = await findUser('SELECT * FROM users WHERE username = ? LIMIT 1', fieldPrivacy, bindings, username);
 	return results.length ? results[0] : null;
 }
 
-export async function getUsers(bindings: Bindings, limit: number = 25, page: number = 0, search: string = '') {
+export async function getUsers(
+	bindings: Bindings,
+	limit: number = 25,
+	page: number = 0,
+	search: string = '',
+	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
+): Promise<UserObject[]> {
 	await checkTableExists(bindings.DB);
 	const query = `SELECT * FROM users${search ? ` WHERE username LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
 
@@ -217,11 +292,11 @@ export async function getUsers(bindings: Bindings, limit: number = 25, page: num
 
 	if (!results || results.error) throw new HTTPException(400, { message: `Database error: ${results.error}` });
 
-	return Promise.all(results.results.map(async (row) => await toUserObject(row, bindings)));
+	return Promise.all(results.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
 
 export async function getAccountBy(
-	predicate: (account: ocean.com.earthapp.account.Account) => boolean,
+	predicate: (account: com.earthapp.account.Account) => boolean,
 	bindings: Bindings
 ): Promise<UserObject | null> {
 	await checkTableExists(bindings.DB);
@@ -229,7 +304,7 @@ export async function getAccountBy(
 	let user: UserObject | null = null;
 	let page = 0;
 	while (!user) {
-		const results = await getUsers(bindings, 100, page);
+		const results = await getUsers(bindings, 100, page, undefined, com.earthapp.account.Privacy.PRIVATE);
 		if (results.length === 0) break;
 
 		for (const u of results) {
@@ -251,14 +326,10 @@ export async function getUserByEmail(email: string, bindings: Bindings) {
 
 // User update functions
 
-export async function patchUser(
-	account: ocean.com.earthapp.account.Account,
-	data: Partial<ocean.com.earthapp.account.Account>,
-	bindings: Bindings
-) {
+export async function patchUser(account: com.earthapp.account.Account, data: Partial<com.earthapp.account.Account>, bindings: Bindings) {
 	await checkTableExists(bindings.DB);
 
-	let newAccount = account.deepCopy() as ocean.com.earthapp.account.Account;
+	let newAccount = account.deepCopy() as com.earthapp.account.Account;
 	newAccount = newAccount.patch(
 		data.username ?? account.username,
 		(data.firstName ?? account.firstName) || 'John',

@@ -5,21 +5,19 @@ import { resolver } from 'hono-openapi/zod';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
-// Event Routes
-import event from './event';
-import currentEvent from './current';
-
-// Implementation
 import Bindings from '../../bindings';
-import { getEvents } from '../../util/routes/events';
+import { bearerAuthMiddleware, getOwnerOfToken } from '../../util/authentication';
+import { getUserFromContext } from '../../util/routes/users';
+import { getEventsByAttendees } from '../../util/routes/events';
 
-const events = new Hono<{ Bindings: Bindings }>();
+const currentEvent = new Hono<{ Bindings: Bindings }>();
 
-events.get(
+currentEvent.get(
 	'/',
 	describeRoute({
-		summary: 'Retrieve a paginated list of all events',
-		description: 'Gets a paginated list of all events in the Earth App.',
+		summary: 'Retrieve all events that the current user is attending',
+		security: [{ BearerAuth: [] }],
+		description: 'Gets all events that the current user is attending.',
 		parameters: [
 			{
 				name: 'page',
@@ -47,7 +45,7 @@ events.get(
 			{
 				name: 'search',
 				in: 'query',
-				description: 'Search query for event names (max 40 characters)',
+				description: 'Search query for usernames (max 40 characters)',
 				required: false,
 				schema: {
 					type: 'string',
@@ -58,18 +56,45 @@ events.get(
 		],
 		responses: {
 			200: {
-				description: 'List of events',
+				description: 'Event details',
 				content: {
 					'application/json': {
 						schema: resolver(schemas.paginated(schemas.event))
 					}
 				}
 			},
-			400: schemas.badRequest
+			400: schemas.badRequest,
+			404: {
+				description: 'Event not found'
+			}
 		},
 		tags: [tags.EVENTS]
 	}),
+	bearerAuthMiddleware(),
 	async (c) => {
+		const bearerToken = c.req.header('Authorization');
+		if (!bearerToken || !bearerToken.startsWith('Bearer ')) {
+			return c.json(
+				{
+					code: 401,
+					message: 'Unauthorized'
+				},
+				401
+			);
+		}
+
+		const token = bearerToken.slice(7);
+		const user = await getOwnerOfToken(token, c.env);
+		if (!user) {
+			return c.json(
+				{
+					code: 401,
+					message: 'Unauthorized: Invalid token'
+				},
+				401
+			);
+		}
+
 		const page = c.req.query('page') ? parseInt(c.req.query('page')!) : 1;
 		const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 25;
 		const search = c.req.query('search') || '';
@@ -104,7 +129,7 @@ events.get(
 			);
 		}
 
-		const events = await getEvents(c.env.DB, limit, page - 1);
+		const events = await getEventsByAttendees([user.account.id], c.env.DB, limit, page - 1, search);
 		return c.json(
 			{
 				page: page,
@@ -117,7 +142,4 @@ events.get(
 	}
 );
 
-events.route('/current', currentEvent);
-events.route('/:eventId', event);
-
-export default events;
+export default currentEvent;

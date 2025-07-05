@@ -1,4 +1,4 @@
-import * as ocean from '@earth-app/ocean';
+import { com } from '@earth-app/ocean';
 import { DBEvent } from '../util/routes/events';
 
 /**
@@ -17,7 +17,7 @@ export type EventObject = {
 	/**
 	 * The event class metadata associated with the event.
 	 */
-	event: ocean.com.earthapp.event.Event;
+	event: com.earthapp.event.Event;
 };
 
 /**
@@ -29,8 +29,8 @@ export type Event = {
 	hostId: string;
 	name: string;
 	description: string;
-	type: typeof ocean.com.earthapp.event.EventType.prototype.name;
-	activities: (typeof ocean.com.earthapp.activity.ActivityType.prototype.name)[];
+	type: typeof com.earthapp.event.EventType.prototype.name;
+	activities: (typeof com.earthapp.activity.ActivityType.prototype.name)[];
 	location?: {
 		latitude: number;
 		longitude: number;
@@ -40,18 +40,18 @@ export type Event = {
 };
 
 /**
- * Converts an ocean.com.earthapp.event.Event object to an Event object.
+ * Converts an com.earthapp.event.Event object to an Event object.
  * @param data The event data to convert.
  * @returns An Event object.
  */
-export function toEvent(data: ocean.com.earthapp.event.Event): Event {
+export function toEvent(data: com.earthapp.event.Event): Event {
 	return {
 		id: data.id,
 		hostId: data.hostId,
 		name: data.name,
 		description: data.description,
 		type: data.type.name,
-		activities: data.activities.asJsArrayView() as (typeof ocean.com.earthapp.activity.ActivityType.prototype.name)[],
+		activities: data.activities.asJsArrayView() as (typeof com.earthapp.activity.ActivityType.prototype.name)[],
 		location: data.location
 			? {
 					latitude: data.location.latitude,
