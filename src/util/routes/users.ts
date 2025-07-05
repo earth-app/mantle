@@ -17,6 +17,7 @@ export async function createUser(username: string, callback: (user: com.earthapp
 		const id = com.earthapp.account.Account.newId();
 		const user = new com.earthapp.account.Account(id, username);
 		callback(user);
+		user.validate();
 
 		return user;
 	} catch (error) {
@@ -330,27 +331,28 @@ export async function patchUser(account: com.earthapp.account.Account, data: Par
 	await checkTableExists(bindings.DB);
 
 	let newAccount = account.deepCopy() as com.earthapp.account.Account;
-	newAccount = newAccount.patch(
-		data.username ?? account.username,
-		(data.firstName ?? account.firstName) || 'John',
-		(data.lastName ?? account.lastName) || 'Doe',
-		data.email ?? account.email,
-		data.address ?? account.address,
-		data.country ?? account.country,
-		data.phoneNumber ?? account.phoneNumber,
-		data.visibility ?? account.visibility
-	);
 
 	try {
+		newAccount = newAccount.patch(
+			data.username ?? account.username,
+			(data.firstName ?? account.firstName) || 'John',
+			(data.lastName ?? account.lastName) || 'Doe',
+			data.email ?? account.email,
+			data.address ?? account.address,
+			data.country ?? account.country,
+			data.phoneNumber ?? account.phoneNumber,
+			data.visibility ?? account.visibility
+		);
+
 		newAccount.validate();
 	} catch (error) {
-		throw new HTTPException(400, { message: `Invalid account data: ${error}` });
+		throw new HTTPException(400, { message: `Failed to patch user: ${error instanceof Error ? error.message : 'Unknown error'}` });
 	}
 
 	const userObject = await getUserById(account.id, bindings);
 	if (!userObject) {
 		console.error(`User with ID ${account.id} not found`);
-		throw new HTTPException(401, { message: 'User not found' });
+		throw new HTTPException(404, { message: 'User not found' });
 	}
 
 	userObject.account = newAccount;

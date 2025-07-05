@@ -1,9 +1,25 @@
 import { D1Database } from '@cloudflare/workers-types';
-import { EventObject, toEvent } from '../../types/events';
+import { Event, EventObject, toEvent } from '../../types/events';
 import { haversineDistance } from '../util';
 
 import { com } from '@earth-app/ocean';
 import * as ocean from '@earth-app/ocean';
+import { HTTPException } from 'hono/http-exception';
+
+// Helpers
+
+export function createEvent(hostId: string, callback: (event: com.earthapp.event.Event) => void): com.earthapp.event.Event {
+	try {
+		const id = com.earthapp.event.Event.newId();
+		const event = new com.earthapp.event.Event(id, hostId);
+		callback(event);
+		event.validate();
+
+		return event;
+	} catch (error) {
+		throw new HTTPException(401, { message: `Failed to create event: ${error}` });
+	}
+}
 
 // Database
 export type DBEvent = {
@@ -11,7 +27,6 @@ export type DBEvent = {
 	binary: Uint8Array;
 	hostId: string;
 	name: string;
-	type: typeof com.earthapp.event.EventType.prototype.name;
 	attendees: string[];
 	latitude?: number;
 	longitude?: number;
@@ -35,7 +50,6 @@ async function checkTableExists(d1: D1Database) {
         binary BLOB NOT NULL,
         hostId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
-        type TEXT NOT NULL,
 		attendees TEXT NOT NULL,
         latitude DOUBLE,
         longitude DOUBLE,
@@ -48,7 +62,6 @@ async function checkTableExists(d1: D1Database) {
 	// Indexes for performance
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_hostId ON events(hostId)`).run();
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_name ON events(name)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)`).run();
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_attendees ON events(attendees)`).run();
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_latitude ON events(latitude)`).run();
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_longitude ON events(longitude)`).run();
@@ -68,7 +81,6 @@ async function findEvent(query: string, d1: D1Database, ...params: any[]): Promi
 				binary: result.binary as Uint8Array,
 				hostId: result.hostId as string,
 				name: result.name as string,
-				type: result.type as typeof ocean.com.earthapp.event.EventType.prototype.name,
 				attendees: result.attendees ? JSON.parse(result.attendees as string) : [],
 				latitude: result.latitude as number | undefined,
 				longitude: result.longitude as number | undefined,
@@ -83,7 +95,7 @@ async function findEvent(query: string, d1: D1Database, ...params: any[]): Promi
 export async function saveEvent(event: com.earthapp.event.Event, d1: D1Database): Promise<EventObject> {
 	await checkTableExists(d1);
 
-	const query = `INSERT INTO events (id, binary, hostId, name, type, attendees, latitude, longitude, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+	const query = `INSERT INTO events (id, binary, hostId, name, attendees, latitude, longitude, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 	const result = await d1
 		.prepare(query)
 		.bind(
@@ -91,7 +103,6 @@ export async function saveEvent(event: com.earthapp.event.Event, d1: D1Database)
 			new Uint8Array(event.toBinary()),
 			event.hostId,
 			event.name,
-			event.type.name,
 			JSON.stringify(event.attendees),
 			event.location?.latitude ?? null,
 			event.location?.longitude ?? null,
@@ -107,12 +118,10 @@ export async function saveEvent(event: com.earthapp.event.Event, d1: D1Database)
 	return newEvent;
 }
 
-export async function updateEvent(event: com.earthapp.event.Event, d1: D1Database): Promise<EventObject> {
+export async function updateEvent(obj: EventObject, d1: D1Database): Promise<EventObject> {
 	const query = `UPDATE events SET
         binary = ?,
-        hostId = ?,
         name = ?,
-        type = ?,
 		attendees = ?,
         latitude = ?,
         longitude = ?,
@@ -123,20 +132,18 @@ export async function updateEvent(event: com.earthapp.event.Event, d1: D1Databas
 	await d1
 		.prepare(query)
 		.bind(
-			new Uint8Array(event.toBinary()),
-			event.hostId,
-			event.name,
-			event.type.name,
-			JSON.stringify(event.attendees),
-			event.location?.latitude ?? null,
-			event.location?.longitude ?? null,
-			event.date,
-			event.id
+			new Uint8Array(obj.event.toBinary()),
+			obj.event.name,
+			JSON.stringify(obj.event.attendees),
+			obj.event.location?.latitude ?? null,
+			obj.event.location?.longitude ?? null,
+			obj.event.date,
+			obj.event.id
 		)
 		.run();
 
-	const updatedEvent = await getEventById(event.id, d1);
-	if (!updatedEvent) throw new Error(`Failed to update event with ID ${event.id}`);
+	const updatedEvent = await getEventById(obj.database.id, d1);
+	if (!updatedEvent) throw new Error(`Failed to update event with ID ${obj.database.id}`);
 
 	return updatedEvent;
 }
@@ -251,4 +258,39 @@ export async function getEventsByAttendees(
 		const eventAttendees = event.database.attendees || [];
 		return attendees.some((attendee) => eventAttendees.includes(attendee) || event.database.hostId === attendee);
 	});
+}
+
+// Event update functions
+
+export async function patchEvent(event: com.earthapp.event.Event, data: Partial<Event>, d1: D1Database) {
+	await checkTableExists(d1);
+
+	let newEvent = event.deepCopy() as com.earthapp.event.Event;
+
+	try {
+		let location: com.earthapp.event.Location | undefined;
+		if (data.location) location = new com.earthapp.event.Location(data.location.latitude, data.location.longitude);
+
+		newEvent = newEvent.patch(
+			data.name ?? newEvent.name,
+			data.description ?? newEvent.description,
+			data.date?.getTime() ?? newEvent.date,
+			data.end_date?.getTime() ?? newEvent.endDate,
+			location,
+			com.earthapp.event.EventType.valueOf(data.type ?? newEvent.type.name),
+			com.earthapp.Visibility.valueOf(data.visibility ?? newEvent.visibility.name)
+		);
+		newEvent.validate();
+	} catch (error) {
+		throw new HTTPException(400, { message: `Failed to patch event: ${error instanceof Error ? error.message : 'Unknown error'}` });
+	}
+
+	const eventObject = await getEventById(event.id, d1);
+	if (!eventObject) {
+		console.error(`Event with ID ${event.id} not found`);
+		throw new HTTPException(404, { message: `Event with ID ${event.id} not found` });
+	}
+
+	eventObject.event = newEvent;
+	return await updateEvent(eventObject, d1);
 }
