@@ -37,6 +37,7 @@ export type Event = {
 	};
 	date: Date;
 	end_date: Date;
+	visibility?: typeof com.earthapp.Visibility.prototype.name;
 	created_at?: Date;
 	updated_at?: Date;
 };
