@@ -8,9 +8,10 @@ import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
 import Bindings from '../../bindings';
-import { getEventById, patchEvent } from '../../util/routes/events';
+import { deleteEvent, getEventById, patchEvent } from '../../util/routes/events';
 import { Event } from '../../types/events';
-import { getOwnerOfToken } from '../../util/authentication';
+import { bearerAuthMiddleware, getOwnerOfToken } from '../../util/authentication';
+import { com } from '@earth-app/ocean';
 
 const event = new Hono<{ Bindings: Bindings }>();
 
@@ -29,8 +30,8 @@ event.get(
 				required: false,
 				schema: {
 					type: 'string',
-					maxLength: 100,
-					default: ''
+					minLength: com.earthapp.util.ID_LENGTH,
+					maxLength: com.earthapp.util.ID_LENGTH
 				}
 			}
 		],
@@ -136,7 +137,8 @@ event.patch(
 				required: true,
 				schema: {
 					type: 'string',
-					maxLength: 100
+					minLength: com.earthapp.util.ID_LENGTH,
+					maxLength: com.earthapp.util.ID_LENGTH
 				}
 			}
 		],
@@ -159,6 +161,8 @@ event.patch(
 				}
 			},
 			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
 			404: {
 				description: 'Event not found',
 				content: {
@@ -170,6 +174,7 @@ event.patch(
 		},
 		tags: [tags.EVENTS]
 	}),
+	bearerAuthMiddleware(),
 	async (c) => {
 		const id = c.req.param('eventId');
 		if (!id) {
@@ -209,8 +214,117 @@ event.patch(
 			);
 		}
 
+		const token = c.req.header('Authorization')?.slice(7);
+		if (!token) {
+			return c.json(
+				{
+					code: 401,
+					message: 'Unauthorized: You must be authenticated to update an event.'
+				},
+				401
+			);
+		}
+
+		const owner = await getOwnerOfToken(token, c.env);
+		if (token !== c.env.ADMIN_API_KEY && (!owner || owner.account.id !== event.event.hostId)) {
+			return c.json(
+				{
+					code: 403,
+					message: 'Forbidden: You do not have permission to update this event.'
+				},
+				403
+			);
+		}
+
 		const updatedEvent = await patchEvent(event.event, data, c.env.DB);
 		return c.json(updatedEvent.public, 200);
+	}
+);
+// Delete Event
+event.delete(
+	'/',
+	describeRoute({
+		summary: 'Delete an event',
+		description: 'Deletes an existing event by its ID.',
+		security: [{ BearerAuth: [] }],
+		parameters: [
+			{
+				name: 'eventId',
+				in: 'path',
+				description: 'Event ID',
+				required: true,
+				schema: {
+					type: 'string',
+					minLength: com.earthapp.util.ID_LENGTH,
+					maxLength: com.earthapp.util.ID_LENGTH
+				}
+			}
+		],
+		responses: {
+			204: {
+				description: 'Event deleted successfully'
+			},
+			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'Event not found',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.error(404, 'Event not found'))
+					}
+				}
+			}
+		},
+		tags: [tags.EVENTS]
+	}),
+	bearerAuthMiddleware(),
+	async (c) => {
+		const id = c.req.param('eventId');
+		if (!id) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Event ID is required'
+				},
+				400
+			);
+		}
+
+		const event = await getEventById(id, c.env.DB);
+		if (!event) {
+			return c.json(
+				{
+					code: 404,
+					message: 'Event not found'
+				},
+				404
+			);
+		}
+
+		const token = c.req.header('Authorization')?.slice(7);
+		if (!token) {
+			return c.json(
+				{
+					code: 401,
+					message: 'Unauthorized: You must be authenticated to delete an event.'
+				},
+				401
+			);
+		}
+		const owner = await getOwnerOfToken(token, c.env);
+		if (token !== c.env.ADMIN_API_KEY && (!owner || owner.account.id !== event.event.hostId)) {
+			return c.json(
+				{
+					code: 403,
+					message: 'Forbidden: You do not have permission to delete this event.'
+				},
+				403
+			);
+		}
+
+		await deleteEvent(id, c.env.DB);
+		return c.body(null, 204);
 	}
 );
 
