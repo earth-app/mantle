@@ -1,44 +1,35 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended",
-    "group:allNonMajor"
-  ],
-  "dependencyDashboard": false,
-  "packageRules": [
-    {
-      "matchDepNames": ["@earth-app/ocean"],
-      "matchDatasources": ["npm"],
-      "enabled": false
-    },
-    {
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ]
-    }
-  ],
-  "regexManagers": [
-    {
-      "fileMatch": ["^package\\.json$"],
-      "matchStrings": [
-        "\"@earth-app/ocean\":\\s*\"1\\.0\\.0-(?<currentValue>)(?<currentDigest>[0-9a-f]{7,40})\""
-      ],
-      "packageNameTemplate": "https://github.com/earth-app/ocean",
-      "depNameTemplate": "@earth-app/ocean",
-      "datasourceTemplate": "git-refs",
-      "versioningTemplate": "git",
-      "currentValueTemplate": "master",
-      "extractVersionTemplate": "1.0.0-{{digestShort}}"
-    }
-  ],
-  "hostRules": [
-    {
-      "matchHost": "https://npm.pkg.github.com",
-      "token": "{{ secrets.GITHUB_TOKEN }}"
-    }
-  ],
-  "npmrc": "@earth-app:registry=https://npm.pkg.github.com"
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended", "group:allNonMajor"],
+	"dependencyDashboard": false,
+	"packageRules": [
+		{
+			"matchDepNames": ["@earth-app/ocean"],
+			"matchDatasources": ["npm"],
+			"matchPaths": ["package.json"],
+			"enabled": false
+		},
+		{
+			"matchUpdateTypes": ["minor", "patch", "pin", "digest"]
+		}
+	],
+	"regexManagers": [
+		{
+			"fileMatch": ["^package\\.json$"],
+			"matchStrings": ["\"@earth-app/ocean\":\\s*\"1\\.0\\.0-(?<currentDigest>[0-9a-f]{7,40})\""],
+			"packageNameTemplate": "https://github.com/earth-app/ocean",
+			"depNameTemplate": "@earth-app/ocean",
+			"datasourceTemplate": "git-refs",
+			"versioningTemplate": "git",
+			"currentValueTemplate": "master",
+			"extractVersionTemplate": "1.0.0-{{digestShort}}"
+		}
+	],
+	"hostRules": [
+		{
+			"matchHost": "https://npm.pkg.github.com",
+			"token": "{{ secrets.GITHUB_TOKEN }}"
+		}
+	],
+	"npmrc": "@earth-app:registry=https://npm.pkg.github.com"
 }
