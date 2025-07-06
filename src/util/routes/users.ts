@@ -1,13 +1,13 @@
 import { D1Database } from '@cloudflare/workers-types';
+import { HTTPException } from 'hono/http-exception';
+import Bindings from '../../bindings';
+import { LoginUser, UserObject, toUser } from '../../types/users';
+import { addSession, getOwnerOfToken } from '../authentication';
 import * as encryption from '../encryption';
 import * as util from '../util';
-import Bindings from '../../bindings';
-import { UserObject, toUser, LoginUser } from '../../types/users';
-import { addSession, getOwnerOfToken } from '../authentication';
-import { HTTPException } from 'hono/http-exception';
 
-import { com } from '@earth-app/ocean';
 import * as ocean from '@earth-app/ocean';
+import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 
 // Helpers

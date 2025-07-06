@@ -8,14 +8,14 @@ import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
 // User Routes
-import loginUser from './login';
 import createUser from './create';
+import loginUser from './login';
 import user from './user';
 
 // Implementation
+import Bindings from '../../bindings';
 import { bearerAuthMiddleware } from '../../util/authentication';
 import { getUsers } from '../../util/routes/users';
-import Bindings from '../../bindings';
 
 const users = new Hono<{ Bindings: Bindings }>();
 

@@ -2,8 +2,8 @@ import { D1Database } from '@cloudflare/workers-types';
 import { Event, EventObject, toEvent } from '../../types/events';
 import { haversineDistance } from '../util';
 
-import { com } from '@earth-app/ocean';
 import * as ocean from '@earth-app/ocean';
+import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 
 // Helpers

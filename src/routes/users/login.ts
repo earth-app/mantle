@@ -6,9 +6,8 @@ import * as tags from '../../openapi/tags';
 
 import Bindings from '../../bindings';
 import { basicAuthMiddleware } from '../../util/authentication';
-import { getCredentials } from '../../util/util';
 import { loginUser } from '../../util/routes/users';
-import { LoginUser } from '../../types/users';
+import { getCredentials } from '../../util/util';
 
 const login = new Hono<{ Bindings: Bindings }>();
 

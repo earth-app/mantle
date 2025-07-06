@@ -1,6 +1,6 @@
 import { cloudflareRateLimiter } from '@hono-rate-limiter/cloudflare';
-import Bindings from '../bindings';
 import { getConnInfo } from 'hono/cloudflare-workers';
+import Bindings from '../bindings';
 
 export function rateLimit(authenticated: boolean = false) {
 	return cloudflareRateLimiter<{ Bindings: Bindings }>({

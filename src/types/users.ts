@@ -1,7 +1,5 @@
 import { com } from '@earth-app/ocean';
 import { DBUser } from '../util/routes/users';
-import { DBEvent } from '../util/routes/events';
-import { Event } from './events';
 
 // Users
 

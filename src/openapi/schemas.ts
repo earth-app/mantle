@@ -1,9 +1,9 @@
+import { com } from '@earth-app/ocean';
+import { resolver } from 'hono-openapi/zod';
 import z from 'zod';
 import 'zod-openapi/extend';
-import { resolver } from 'hono-openapi/zod';
-import { com } from '@earth-app/ocean';
 
-import { LoginUser, User } from '../types/users';
+import { LoginUser } from '../types/users';
 
 // Root Types
 export function error(code: number, message: string) {

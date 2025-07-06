@@ -4,8 +4,8 @@ import { Hono } from 'hono';
 import hello from './hello';
 import info from './info';
 
-import users from './users';
 import events from './events';
+import users from './users';
 
 // Implementation
 const routes = new Hono();

@@ -1,4 +1,4 @@
-import { Context, Hono } from 'hono';
+import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
 import type { OpenAPIV3 } from 'openapi-types';
@@ -6,12 +6,12 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
-import Bindings from '../../bindings';
-import { deleteUser, getUserById, getUserByUsername, getUserFromContext, patchUser } from '../../util/routes/users';
-import { bearerAuthMiddleware, getOwnerOfToken } from '../../util/authentication';
-import { User, UserObject } from '../../types/users';
 import { com } from '@earth-app/ocean';
 import { ContentfulStatusCode } from 'hono/utils/http-status';
+import Bindings from '../../bindings';
+import { User, UserObject } from '../../types/users';
+import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer } from '../../util/authentication';
+import { deleteUser, getUserById, getUserByUsername, getUserFromContext, patchUser } from '../../util/routes/users';
 
 const user = new Hono<{ Bindings: Bindings }>();
 
@@ -22,19 +22,7 @@ user.get('/', async (c) => {
 
 	// Current User
 	if (!path) {
-		const bearerToken = c.req.header('Authorization');
-		if (!bearerToken || !bearerToken.startsWith('Bearer ')) {
-			return c.json(
-				{
-					code: 401,
-					message: 'Unauthorized'
-				},
-				401
-			);
-		}
-
-		const token = bearerToken.slice(7);
-		user = await getOwnerOfToken(token, c.env);
+		user = await getOwnerOfBearer(c);
 		if (!user) {
 			return c.json(
 				{
@@ -65,45 +53,15 @@ user.get('/', async (c) => {
 		);
 	}
 
-	switch (user.account.visibility.name.toLowerCase()) {
-		// Unlisted - Requires authentication
-		case 'unlisted': {
-			if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
-				return c.json(
-					{
-						code: 403,
-						message: 'Forbidden: This user is unlisted and requires authentication to view.'
-					},
-					403
-				);
-			}
-			break;
-		}
-		// Private - Admin & Friends only
-		case 'private': {
-			if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
-				return c.json(
-					{
-						code: 403,
-						message: 'Forbidden: This user is private.'
-					},
-					403
-				);
-			}
-
-			const token = c.req.header('Authorization')!.slice(7);
-			if (token !== c.env.ADMIN_API_KEY) {
-				return c.json(
-					{
-						code: 403,
-						message: 'Forbidden: You do not have permission to view this user.'
-					},
-					403
-				);
-			}
-
-			break;
-		}
+	const visibility = checkVisibility(user.account.visibility, c);
+	if (!visibility.success) {
+		return c.json(
+			{
+				code: visibility.code,
+				message: visibility.message
+			},
+			visibility.code
+		);
 	}
 
 	return c.json(user.public);

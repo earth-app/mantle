@@ -1,10 +1,10 @@
+import { swaggerUI } from '@hono/swagger-ui';
 import { Hono } from 'hono';
 import { openAPISpecs } from 'hono-openapi';
-import { swaggerUI } from '@hono/swagger-ui';
 
+import { cache } from 'hono/cache';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { cache } from 'hono/cache';
 import { secureHeaders } from 'hono/secure-headers';
 
 import routes from './routes';
