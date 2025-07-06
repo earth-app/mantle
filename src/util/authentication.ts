@@ -1,13 +1,14 @@
-import { bearerAuth } from 'hono/bearer-auth';
-import { basicAuth } from 'hono/basic-auth';
 import { D1Database } from '@cloudflare/workers-types';
 import { com } from '@earth-app/ocean';
+import { basicAuth } from 'hono/basic-auth';
+import { bearerAuth } from 'hono/bearer-auth';
 
-import * as encryption from './encryption';
-import * as util from './util';
-import Bindings from '../bindings';
 import { Context } from 'hono';
+import { ContentfulStatusCode } from 'hono/utils/http-status';
+import Bindings from '../bindings';
+import * as encryption from './encryption';
 import { getUserById, getUserByUsername } from './routes/users';
+import * as util from './util';
 
 type TokenRow = {
 	id: number;
@@ -281,6 +282,68 @@ export async function bumpCurrentSession(owner: string, d1: D1Database) {
 
 	const query = `UPDATE tokens SET expires_at = datetime('now', '+14 days') WHERE owner = ? AND is_session = TRUE ORDER BY created_at DESC LIMIT 1`;
 	await d1.prepare(query).bind(owner).run();
+}
+
+// Authentication Helpers
+
+export function checkVisibility(
+	visibility: com.earthapp.Visibility,
+	c: Context<{ Bindings: Bindings }>
+): { success: false; code: ContentfulStatusCode; message: string } | { success: true } {
+	if (!visibility || visibility === com.earthapp.Visibility.PUBLIC) {
+		return {
+			success: true
+		};
+	}
+
+	switch (visibility.name.toLowerCase()) {
+		// Unlisted - Requires authentication
+		case 'unlisted': {
+			if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
+				return {
+					success: false,
+					code: 403,
+					message: 'Forbidden: This element is unlisted and requires authentication to view.'
+				};
+			}
+			break;
+		}
+		// Private - Admin & Owner only
+		case 'private': {
+			if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
+				return {
+					success: false,
+					code: 403,
+					message: 'Forbidden: This element is private.'
+				};
+			}
+
+			const token = c.req.header('Authorization')!.slice(7);
+			if (token !== c.env.ADMIN_API_KEY) {
+				return {
+					success: false,
+					code: 403,
+					message: 'Forbidden: You do not have permission to view this.'
+				};
+			}
+
+			break;
+		}
+	}
+
+	return {
+		success: true
+	};
+}
+
+export async function getOwnerOfBearer(c: Context<{ Bindings: Bindings }>) {
+	const bearerToken = c.req.header('Authorization');
+	if (!bearerToken || !bearerToken.startsWith('Bearer ')) return null;
+
+	const token = bearerToken.slice(7);
+	const user = await getOwnerOfToken(token, c.env);
+
+	return user;
 }
 
 // Middleware
