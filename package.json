@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",
-    "@earth-app/ocean": "1.0.0-18e9012",
+    "@earth-app/ocean": "1.0.0-bb5a3a6",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-validator": "^0.7.0",
@@ -26,6 +26,7 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
+    "prettier-plugin-organize-imports": "^4.1.0",
     "wrangler": "^4.23.0"
   },
   "lint-staged": {
