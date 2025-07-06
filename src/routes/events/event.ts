@@ -7,11 +7,11 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
-import Bindings from '../../bindings';
-import { deleteEvent, getEventById, patchEvent } from '../../util/routes/events';
-import { Event } from '../../types/events';
-import { bearerAuthMiddleware, getOwnerOfToken } from '../../util/authentication';
 import { com } from '@earth-app/ocean';
+import Bindings from '../../bindings';
+import { Event } from '../../types/events';
+import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
+import { deleteEvent, getEventById, patchEvent } from '../../util/routes/events';
 
 const event = new Hono<{ Bindings: Bindings }>();
 
@@ -74,51 +74,24 @@ event.get(
 			);
 		}
 
-		switch (event.event.visibility.name.toLowerCase()) {
-			// Unlisted - Requires authentication
-			case 'unlisted': {
-				if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
-					return c.json(
-						{
-							code: 403,
-							message: 'Forbidden: This event is unlisted and requires authentication to view.'
-						},
-						403
-					);
-				}
-				break;
-			}
-			// Private - Admin & Attendees only
-			case 'private': {
-				if (!c.req.header('Authorization') || !c.req.header('Authorization')?.startsWith('Bearer ')) {
-					return c.json(
-						{
-							code: 403,
-							message: 'Forbidden: This event is private.'
-						},
-						403
-					);
-				}
+		// Short circuit visibility check
+		const visibility = checkVisibility(event.event.visibility, c);
+		if (visibility.success) return c.json(event.public, 200);
 
-				const token = c.req.header('Authorization')!.slice(7);
-				const owner = await getOwnerOfToken(token, c.env);
-				const attendee = owner && event.event.isAttendee(owner.account);
+		const owner = await getOwnerOfBearer(c);
+		const isAllowed =
+			(owner && event.database.hostId == owner.database.id) || event.event.attendees.asJsArrayView().includes(owner?.database.id ?? '');
 
-				if (!attendee && token !== c.env.ADMIN_API_KEY) {
-					return c.json(
-						{
-							code: 403,
-							message: 'Forbidden: You do not have permission to view this event.'
-						},
-						403
-					);
-				}
+		if (isAllowed) return c.json(event.public, 200);
 
-				break;
-			}
-		}
-
-		return c.json(event.public, 200);
+		// Fallback to fail if visibility check fails
+		return c.json(
+			{
+				code: visibility.code,
+				message: visibility.message
+			},
+			visibility.code
+		);
 	}
 );
 

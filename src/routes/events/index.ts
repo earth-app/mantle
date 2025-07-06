@@ -7,13 +7,13 @@ import * as tags from '../../openapi/tags';
 
 // Event Routes
 import createEvent from './create';
-import event from './event';
 import currentEvent from './current';
+import event from './event';
 
 // Implementation
 import Bindings from '../../bindings';
-import { getEvents } from '../../util/routes/events';
 import { bearerAuthMiddleware } from '../../util/authentication';
+import { getEvents } from '../../util/routes/events';
 
 const events = new Hono<{ Bindings: Bindings }>();
 

@@ -7,10 +7,10 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
-import Bindings from '../../bindings';
 import { com } from '@earth-app/ocean';
+import Bindings from '../../bindings';
+import { getOwnerOfBearer } from '../../util/authentication';
 import * as events from '../../util/routes/events';
-import { getOwnerOfToken } from '../../util/authentication';
 
 const createEvent = new Hono<{ Bindings: Bindings }>();
 
@@ -93,23 +93,12 @@ createEvent.post(
 			);
 		}
 
-		const token = c.req.header('Authorization')?.slice(7);
-		if (!token) {
-			return c.json(
-				{
-					code: 401,
-					message: 'Unauthorized: Missing token'
-				},
-				401
-			);
-		}
-
-		const owner = await getOwnerOfToken(token, c.env);
+		const owner = await getOwnerOfBearer(c);
 		if (!owner) {
 			return c.json(
 				{
 					code: 401,
-					message: 'Unauthorized: Invalid token'
+					message: 'Unauthorized'
 				},
 				401
 			);
