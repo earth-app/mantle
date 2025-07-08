@@ -4,12 +4,6 @@
 	"dependencyDashboard": false,
 	"packageRules": [
 		{
-			"matchDepNames": ["@earth-app/ocean"],
-			"matchDatasources": ["npm"],
-			"matchPaths": ["package.json"],
-			"enabled": false
-		},
-		{
 			"matchUpdateTypes": ["minor", "patch", "pin", "digest"]
 		}
 	],
