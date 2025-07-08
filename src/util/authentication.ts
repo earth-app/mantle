@@ -177,7 +177,7 @@ export async function getOwnerOfToken(token: string, bindings: Bindings) {
 
 	if (!row) return null;
 
-	return await getUserById(row.owner, bindings);
+	return await getUserById(row.owner, bindings, com.earthapp.account.Privacy.PRIVATE);
 }
 
 // Session Management

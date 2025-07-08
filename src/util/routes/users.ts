@@ -1,7 +1,7 @@
 import { D1Database } from '@cloudflare/workers-types';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
-import { LoginUser, UserObject, toUser } from '../../types/users';
+import { LoginUser, User, UserObject, toUser } from '../../types/users';
 import { addSession, getOwnerOfToken } from '../authentication';
 import * as encryption from '../encryption';
 import * as util from '../util';
@@ -145,11 +145,8 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 
 // Update User Function
 
-async function updateUser(user: UserObject, bindings: Bindings) {
+async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings) {
 	await checkTableExists(bindings.DB);
-
-	const usernameQuery = `UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-	await bindings.DB.prepare(usernameQuery).bind(user.account.username, user.database.id).run();
 
 	const data = new Uint8Array(user.account.toBinary());
 	const encryptionKey = JSON.parse(user.database.encryption_key);
@@ -161,8 +158,12 @@ async function updateUser(user: UserObject, bindings: Bindings) {
 	const iv = util.fromBase64(user.database.encryption_iv);
 	const encryptedData = await encryption.encryptData(decryptedKey, data, iv);
 
-	const updateBinaryQuery = `UPDATE users SET binary = ? WHERE id = ?`;
-	await bindings.DB.prepare(updateBinaryQuery).bind(encryptedData, user.database.id).run();
+	const query = `UPDATE users SET username = ?, binary = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+
+	const res = await bindings.DB.prepare(query).bind(user.account.username, encryptedData, user.database.id).run();
+	if (!res.success) throw new HTTPException(400, { message: `Database error: ${res.error}` });
+
+	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
 }
 
 async function findUser(query: string, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings, ...params: any[]) {
@@ -232,10 +233,10 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>) {
 		if (path.startsWith('@')) {
 			// By Username
 			const username = path.slice(1);
-			user = await getUserByUsername(username, c.env);
+			user = await getUserByUsername(username, c.env, com.earthapp.account.Privacy.PRIVATE);
 		} else {
 			// By ID
-			user = await getUserById(path, c.env);
+			user = await getUserById(path, c.env, com.earthapp.account.Privacy.PRIVATE);
 		}
 	}
 
@@ -327,36 +328,41 @@ export async function getUserByEmail(email: string, bindings: Bindings) {
 
 // User update functions
 
-export async function patchUser(account: com.earthapp.account.Account, data: Partial<com.earthapp.account.Account>, bindings: Bindings) {
+export async function patchUser(account: com.earthapp.account.Account, bindings: Bindings, data?: DeepPartial<User['account']>) {
 	await checkTableExists(bindings.DB);
 
-	let newAccount = account.deepCopy() as com.earthapp.account.Account;
+	let newAccount: com.earthapp.account.Account;
 
-	try {
-		newAccount = newAccount.patch(
-			data.username ?? account.username,
-			(data.firstName ?? account.firstName) || 'John',
-			(data.lastName ?? account.lastName) || 'Doe',
-			data.email ?? account.email,
-			data.address ?? account.address,
-			data.country ?? account.country,
-			data.phoneNumber ?? account.phoneNumber,
-			data.visibility ?? account.visibility
-		);
-
-		newAccount.validate();
-	} catch (error) {
-		throw new HTTPException(400, { message: `Failed to patch user: ${error instanceof Error ? error.message : 'Unknown error'}` });
+	if (data) {
+		newAccount = account.deepCopy() as com.earthapp.account.Account;
+		try {
+			newAccount.patch(
+				data.username ?? account.username,
+				(data.firstName ?? account.firstName) || 'John',
+				(data.lastName ?? account.lastName) || 'Doe',
+				data.email ?? account.email,
+				data.address ?? account.address,
+				data.country ?? account.country,
+				data.phone_number ?? account.phoneNumber,
+				com.earthapp.Visibility.valueOf(data.visibility ?? account.visibility.name)
+			);
+		} catch (error) {
+			throw new HTTPException(400, { message: `Failed to patch user: ${error instanceof Error ? error.message : 'Unknown error'}` });
+		}
+	} else {
+		newAccount = account;
 	}
 
-	const userObject = await getUserById(account.id, bindings);
+	const userObject = await getUserById(account.id, bindings, com.earthapp.account.Privacy.PRIVATE);
 	if (!userObject) {
 		console.error(`User with ID ${account.id} not found`);
 		throw new HTTPException(404, { message: 'User not found' });
 	}
 
 	userObject.account = newAccount;
-	await updateUser(userObject, bindings);
+	await updateUser(userObject, com.earthapp.account.Privacy.PRIVATE, bindings);
+
+	return userObject.public;
 }
 
 export async function deleteUser(id: string, bindings: Bindings) {

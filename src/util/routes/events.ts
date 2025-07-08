@@ -280,7 +280,6 @@ export async function patchEvent(event: com.earthapp.event.Event, data: Partial<
 			com.earthapp.event.EventType.valueOf(data.type ?? newEvent.type.name),
 			com.earthapp.Visibility.valueOf(data.visibility ?? newEvent.visibility.name)
 		);
-		newEvent.validate();
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to patch event: ${error instanceof Error ? error.message : 'Unknown error'}` });
 	}
