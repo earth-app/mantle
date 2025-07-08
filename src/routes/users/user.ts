@@ -80,7 +80,7 @@ user.patch('/', bearerAuthMiddleware(), async (c) => {
 		);
 	}
 
-	let data: Partial<com.earthapp.account.Account> = await c.req.json();
+	let data: DeepPartial<User['account']> = await c.req.json();
 	if (!data || typeof data !== 'object') {
 		return c.json(
 			{
@@ -113,9 +113,7 @@ user.patch('/', bearerAuthMiddleware(), async (c) => {
 	}
 
 	// Update user properties
-	await patchUser(user.account, data, c.env);
-	const returned = (await getUserById(user.account.id, c.env))!.public;
-
+	const returned = await patchUser(user.account, c.env, data);
 	return c.json(returned, 200);
 });
 
@@ -179,7 +177,7 @@ user.patch(
 			);
 		}
 
-		let data: Partial<User['account']['visibility']> = await c.req.json();
+		let data: Partial<User['account']['field_privacy']> = await c.req.json();
 		if (!data || typeof data !== 'object') {
 			return c.json(
 				{
@@ -202,42 +200,22 @@ user.patch(
 		}
 
 		const user = res.data;
-
-		// Sanitize Body
-		const allowedFields = Object.keys(user.public.account.visibility);
-
-		// Filter data to only include allowed fields
-		const sanitizedData: Partial<User['account']['visibility']> = Object.keys(data)
-			.filter((key) => allowedFields.includes(key))
-			.reduce((obj, key) => {
-				obj[key] = (data as any)[key];
-				return obj;
-			}, {} as any);
-
-		for (const [key, value] of Object.entries(sanitizedData)) {
-			if (key === 'account') continue;
-			if (key in user.account.visibility) {
-				user.account.setFieldPrivacy(key, com.earthapp.account.Privacy.valueOf(value as string));
-			} else {
-				// In case sanitization failed
-				console.warn(`Invalid field: ${key} in user visibility update for ${user.public.username}`);
-				return c.json(
-					{
-						code: 400,
-						message: `Invalid field: ${key}`
-					},
-					400
-				);
+		try {
+			for (const [key, value] of Object.entries(data)) {
+				const privacy = com.earthapp.account.Privacy.valueOf(value.toUpperCase());
+				user.account.setFieldPrivacy(key, privacy);
 			}
+		} catch (error) {
+			return c.json(
+				{
+					code: 400,
+					message: `Failed to update field privacy: ${error instanceof Error ? error.message : 'Unknown error'}`
+				},
+				400
+			);
 		}
 
-		await patchUser(
-			user.account,
-			{ visibility: com.earthapp.Visibility.valueOf(sanitizedData.account ?? user.public.account.visibility.account) },
-			c.env
-		);
-		const updated = (await getUserById(user.account.id, c.env))!.public;
-
+		const updated = await patchUser(user.account, c.env);
 		return c.json(updated, 200);
 	}
 );

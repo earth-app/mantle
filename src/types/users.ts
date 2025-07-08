@@ -35,7 +35,7 @@ export type User = {
 	updated_at?: Date;
 	last_login?: Date;
 	account: {
-		type: string;
+		type: 'com.earthapp.account.Account';
 		id: string;
 		firstName?: string;
 		lastName?: string;
@@ -44,11 +44,13 @@ export type User = {
 		email?: string;
 		address?: string;
 		country?: string;
-		phoneNumber?: number;
-		visibility: {
-			account: typeof com.earthapp.Visibility.prototype.name;
+		phone_number?: number;
+		visibility: typeof com.earthapp.Visibility.prototype.name;
+		field_privacy: {
 			name: typeof com.earthapp.account.Privacy.prototype.name;
 			bio: typeof com.earthapp.account.Privacy.prototype.name;
+			phone_number: typeof com.earthapp.account.Privacy.prototype.name;
+			country: typeof com.earthapp.account.Privacy.prototype.name;
 			email: typeof com.earthapp.account.Privacy.prototype.name;
 			address: typeof com.earthapp.account.Privacy.prototype.name;
 			activities: typeof com.earthapp.account.Privacy.prototype.name;
@@ -57,12 +59,14 @@ export type User = {
 			last_login: typeof com.earthapp.account.Privacy.prototype.name;
 			account_type: typeof com.earthapp.account.Privacy.prototype.name;
 		};
+		activities: {
+			type: 'com.earthapp.activity.Activity';
+			id: string;
+			name: string;
+			description?: string;
+			activity_types: (typeof com.earthapp.activity.ActivityType.prototype.name)[];
+		}[];
 	};
-	activities?: {
-		id: string;
-		name: string;
-		types: (typeof com.earthapp.activity.ActivityType.prototype.name)[];
-	}[];
 };
 
 /**
@@ -92,19 +96,7 @@ export function toUser(
 		updated_at: updated_at,
 		last_login: last_login,
 		account: {
-			...JSON.parse(data.toJson()),
-			visibility: {
-				account: data.visibility.name,
-				name: data.getFieldPrivacy('name').name,
-				bio: data.getFieldPrivacy('bio').name,
-				email: data.getFieldPrivacy('email').name,
-				address: data.getFieldPrivacy('address').name,
-				activities: data.getFieldPrivacy('activities').name,
-				events: data.getFieldPrivacy('events').name,
-				friends: data.getFieldPrivacy('friends').name,
-				last_login: data.getFieldPrivacy('last_login').name,
-				account_type: data.getFieldPrivacy('account_type').name
-			}
+			...JSON.parse(data.toJson())
 		}
 	};
 
@@ -136,16 +128,12 @@ export function toUser(
 
 	// Phone Number
 	if (data.isFieldPrivate('phoneNumber', privacy)) {
-		user.account.phoneNumber = undefined;
+		user.account.phone_number = undefined;
 	}
 
 	// Activities
-	if (!data.isFieldPrivate('activities', privacy)) {
-		user.activities = data.activities.asJsArrayView().map((activity) => ({
-			id: activity.id,
-			name: activity.name,
-			types: activity.types.asJsArrayView().map((type) => type.name)
-		}));
+	if (data.isFieldPrivate('activities', privacy)) {
+		user.account.activities = [];
 	}
 
 	return user;
