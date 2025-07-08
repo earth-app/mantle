@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@cloudflare/workers-types": "^4.20250705.0",
-    "@earth-app/ocean": "1.0.0-bb5a3a6",
+    "@earth-app/ocean": "1.0.0-ed3512a",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-validator": "^0.7.0",
