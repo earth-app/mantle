@@ -6,6 +6,7 @@ assets = { directory = "public" }
 routes = [
     { pattern = "api.earth-app.com", custom_domain = true }
 ]
+send_metrics = false
 
 [observability]
 enabled = true
