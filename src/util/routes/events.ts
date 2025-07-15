@@ -22,6 +22,7 @@ export function createEvent(hostId: string, callback: (event: com.earthapp.event
 }
 
 // Database
+
 export type DBEvent = {
 	id: string;
 	binary: Uint8Array;
@@ -35,10 +36,10 @@ export type DBEvent = {
 	updated_at?: Date;
 };
 
-async function toEventObject(event: DBEvent): Promise<EventObject> {
+function toEventObject(event: DBEvent): EventObject {
 	const eventClass = ocean.fromBinary(new Int8Array(event.binary)) as com.earthapp.event.Event;
 	return {
-		public: toEvent(eventClass),
+		public: toEvent(eventClass, event.created_at, event.updated_at),
 		database: event,
 		event: eventClass
 	};
@@ -57,7 +58,10 @@ async function checkTableExists(d1: D1Database) {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`;
-	await d1.prepare(query).run();
+	const result = await d1.prepare(query).run();
+	if (result.error) {
+		throw new HTTPException(500, { message: `Failed to create events table: ${result.error}` });
+	}
 
 	// Indexes for performance
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_hostId ON events(hostId)`).run();
@@ -74,22 +78,20 @@ async function findEvent(query: string, d1: D1Database, ...params: any[]): Promi
 	const row = await d1.prepare(query).bind(params).all();
 	if (!row) throw new Error(`No events found for query: ${query} with params: '${params.join(', ')}'`);
 
-	return Promise.all(
-		row.results.map((result) => {
-			const event: DBEvent = {
-				id: result.id as string,
-				binary: result.binary as Uint8Array,
-				hostId: result.hostId as string,
-				name: result.name as string,
-				attendees: result.attendees ? JSON.parse(result.attendees as string) : [],
-				latitude: result.latitude as number | undefined,
-				longitude: result.longitude as number | undefined,
-				date: new Date(result.date as number)
-			};
+	return row.results.map((result) => {
+		const event: DBEvent = {
+			id: result.id as string,
+			binary: result.binary as Uint8Array,
+			hostId: result.hostId as string,
+			name: result.name as string,
+			attendees: result.attendees ? JSON.parse(result.attendees as string) : [],
+			latitude: result.latitude as number | undefined,
+			longitude: result.longitude as number | undefined,
+			date: new Date(result.date as number)
+		};
 
-			return toEventObject(event);
-		})
-	);
+		return toEventObject(event);
+	});
 }
 
 export async function saveEvent(event: com.earthapp.event.Event, d1: D1Database): Promise<EventObject> {
@@ -112,9 +114,18 @@ export async function saveEvent(event: com.earthapp.event.Event, d1: D1Database)
 
 	if (!result.success) throw new Error(`Failed to save event with ID ${event.id}: ${result.error}`);
 
-	const newEvent = await getEventById(event.id, d1);
-	if (!newEvent) throw new Error(`Failed to save event with ID ${event.id}`);
-
+	const newEvent = toEventObject({
+		id: event.id,
+		binary: new Uint8Array(event.toBinary()),
+		hostId: event.hostId,
+		name: event.name,
+		attendees: event.attendees.asJsArrayView() as string[],
+		latitude: event.location?.latitude,
+		longitude: event.location?.longitude,
+		date: new Date(event.date),
+		created_at: new Date(),
+		updated_at: new Date()
+	});
 	return newEvent;
 }
 
@@ -126,10 +137,12 @@ export async function updateEvent(obj: EventObject, d1: D1Database): Promise<Eve
         latitude = ?,
         longitude = ?,
         date = ?,
-        updated_at = CURRENT_TIMESTAMP,
+        updated_at = ?,
         WHERE id = ?`;
 
-	await d1
+	const updatedAt = new Date(); // Prevent mismatched timestamps in case SQL takes time
+
+	const result = await d1
 		.prepare(query)
 		.bind(
 			new Uint8Array(obj.event.toBinary()),
@@ -138,13 +151,25 @@ export async function updateEvent(obj: EventObject, d1: D1Database): Promise<Eve
 			obj.event.location?.latitude ?? null,
 			obj.event.location?.longitude ?? null,
 			obj.event.date,
+			updatedAt,
 			obj.event.id
 		)
 		.run();
 
-	const updatedEvent = await getEventById(obj.database.id, d1);
-	if (!updatedEvent) throw new Error(`Failed to update event with ID ${obj.database.id}`);
+	if (!result.success) throw new Error(`Failed to update event with ID ${obj.event.id}: ${result.error}`);
 
+	const updatedEvent = toEventObject({
+		id: obj.database.id,
+		binary: new Uint8Array(obj.event.toBinary()),
+		hostId: obj.database.hostId,
+		name: obj.event.name,
+		attendees: obj.event.attendees.asJsArrayView() as string[],
+		latitude: obj.event.location?.latitude,
+		longitude: obj.event.location?.longitude,
+		date: new Date(obj.event.date),
+		created_at: obj.database.created_at,
+		updated_at: updatedAt
+	});
 	return updatedEvent;
 }
 

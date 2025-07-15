@@ -70,7 +70,10 @@ async function checkTableExists(d1: D1Database) {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`;
-	await d1.prepare(query).run();
+	const result = await d1.prepare(query).run();
+	if (result.error) {
+		throw new HTTPException(500, { message: `Failed to create users table: ${result.error}` });
+	}
 
 	// Indexes for performance
 	await d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id)`).run();

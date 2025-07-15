@@ -45,6 +45,8 @@ export type Event = {
 /**
  * Converts an com.earthapp.event.Event object to an Event object.
  * @param data The event data to convert.
+ * @param created_at The creation date of the event.
+ * @param updated_at The last updated date of the event.
  * @returns An Event object.
  */
 export function toEvent(data: com.earthapp.event.Event, created_at: Date = new Date(), updated_at: Date = new Date()): Event {
