@@ -52,45 +52,63 @@ createUser.post(
 				400
 			);
 
-		const usernameExists = await users.getUserByUsername(username, c.env);
-		if (usernameExists)
+		try {
+			if (await users.doesUsernameExist(username, c.env))
+				return c.json(
+					{
+						code: 400,
+						message: `Username ${username} already exists`
+					},
+					400
+				);
+
+			const emailExists = await users.getUserByEmail(email, c.env);
+			if (emailExists)
+				return c.json(
+					{
+						code: 400,
+						message: `Email ${email} is already registered`
+					},
+					400
+				);
+
+			const user = await users.createUser(username, (user) => {
+				user.email = email;
+
+				if (req.firstName) user.firstName = req.firstName;
+
+				if (req.lastName) user.lastName = req.lastName;
+			});
+			if (!user) {
+				return c.json(
+					{
+						code: 500,
+						message: 'Failed to create user'
+					},
+					500
+				);
+			}
+
+			const result = await users.saveUser(user, password, c.env);
+			if (!result)
+				return c.json(
+					{
+						code: 400,
+						message: 'Failed to create user'
+					},
+					400
+				);
+
+			return c.json(result.public, 201);
+		} catch (error) {
 			return c.json(
 				{
-					code: 400,
-					message: `Username ${username} already exists`
+					code: 500,
+					message: `Failed to create user: ${error}`
 				},
-				400
+				500
 			);
-
-		const emailExists = await users.getUserByEmail(email, c.env);
-		if (emailExists)
-			return c.json(
-				{
-					code: 400,
-					message: `Email ${email} is already registered`
-				},
-				400
-			);
-
-		const user = await users.createUser(username, (user) => {
-			user.email = email;
-
-			if (req.firstName) user.firstName = req.firstName;
-
-			if (req.lastName) user.lastName = req.lastName;
-		});
-
-		const result = await users.saveUser(user, password, c.env);
-		if (!result)
-			return c.json(
-				{
-					code: 400,
-					message: 'Failed to create user'
-				},
-				400
-			);
-
-		return c.json(result.public, 201);
+		}
 	}
 );
 

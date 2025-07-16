@@ -130,9 +130,29 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 		);
 	}
 	const user = res.data;
-	await deleteUser(user.account.id, c.env);
 
-	return c.body(null, 204);
+	try {
+		const result = await deleteUser(user.account.id, c.env);
+		if (!result) {
+			return c.json(
+				{
+					code: 404,
+					message: 'User not found'
+				},
+				404
+			);
+		}
+
+		return c.body(null, 204);
+	} catch (error) {
+		return c.json(
+			{
+				code: 500,
+				message: `Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`
+			},
+			500
+		);
+	}
 });
 
 // Change Field Privacy

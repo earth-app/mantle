@@ -21,7 +21,7 @@ export async function createUser(username: string, callback: (user: com.earthapp
 
 		return user;
 	} catch (error) {
-		throw new HTTPException(401, { message: `Failed to create user: ${error}` });
+		throw new HTTPException(400, { message: `Failed to create user: ${error}` });
 	}
 }
 
@@ -260,6 +260,15 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>) {
 
 // User retrieval functions
 
+export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {
+	await checkTableExists(bindings.DB);
+	const query = `SELECT COUNT(*) as count FROM users WHERE username = ?`;
+	const result = await bindings.DB.prepare(query).bind(username).first<{ count: number }>();
+	if (!result) return false;
+
+	return result.count > 0;
+}
+
 export async function getUserById(
 	id: string,
 	bindings: Bindings,
@@ -334,6 +343,12 @@ export async function getUserByEmail(email: string, bindings: Bindings) {
 export async function patchUser(account: com.earthapp.account.Account, bindings: Bindings, data?: DeepPartial<User['account']>) {
 	await checkTableExists(bindings.DB);
 
+	const userObject = await getUserById(account.id, bindings, com.earthapp.account.Privacy.PRIVATE);
+	if (!userObject) {
+		console.error(`User with ID ${account.id} not found`);
+		throw new HTTPException(404, { message: 'User not found' });
+	}
+
 	let newAccount: com.earthapp.account.Account;
 
 	if (data) {
@@ -356,23 +371,16 @@ export async function patchUser(account: com.earthapp.account.Account, bindings:
 		newAccount = account;
 	}
 
-	const userObject = await getUserById(account.id, bindings, com.earthapp.account.Privacy.PRIVATE);
-	if (!userObject) {
-		console.error(`User with ID ${account.id} not found`);
-		throw new HTTPException(404, { message: 'User not found' });
-	}
-
 	userObject.account = newAccount;
 	await updateUser(userObject, com.earthapp.account.Privacy.PRIVATE, bindings);
 
 	return userObject.public;
 }
 
-export async function deleteUser(id: string, bindings: Bindings) {
+export async function deleteUser(id: string, bindings: Bindings): Promise<boolean> {
 	await checkTableExists(bindings.DB);
 
-	const query = `DELETE FROM users WHERE id = ?`;
-	const result = await bindings.DB.prepare(query).bind(id).run();
+	const result = await bindings.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
 
-	if (result.error) throw new HTTPException(404, { message: 'User not found' });
+	return result.success;
 }

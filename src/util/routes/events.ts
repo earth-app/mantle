@@ -17,7 +17,7 @@ export function createEvent(hostId: string, callback: (event: com.earthapp.event
 
 		return event;
 	} catch (error) {
-		throw new HTTPException(401, { message: `Failed to create event: ${error}` });
+		throw new HTTPException(400, { message: `Failed to create event: ${error}` });
 	}
 }
 
@@ -75,8 +75,12 @@ async function checkTableExists(d1: D1Database) {
 async function findEvent(query: string, d1: D1Database, ...params: any[]): Promise<EventObject[]> {
 	await checkTableExists(d1);
 
-	const row = await d1.prepare(query).bind(params).all();
-	if (!row) throw new Error(`No events found for query: ${query} with params: '${params.join(', ')}'`);
+	const row = await d1
+		.prepare(query)
+		.bind(...params)
+		.all();
+
+	if (!row || !row.success) throw new Error(`No events found for query: ${query} with params: '${params.join(', ')}'`);
 
 	return row.results.map((result) => {
 		const event: DBEvent = {
@@ -189,7 +193,7 @@ export async function getEvents(d1: D1Database, limit: number = 25, page: number
 	const query = `SELECT * FROM events${search ? `WHERE name LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
 	let results: EventObject[];
 
-	if (search) results = await findEvent(query, d1, limit, page * limit, `%${search}%`);
+	if (search) results = await findEvent(query, d1, `%${search}%`, limit, page * limit);
 	else results = await findEvent(query, d1, limit, page * limit);
 
 	return results;
@@ -290,6 +294,12 @@ export async function getEventsByAttendees(
 export async function patchEvent(event: com.earthapp.event.Event, data: Partial<Event>, d1: D1Database) {
 	await checkTableExists(d1);
 
+	const eventObject = await getEventById(event.id, d1);
+	if (!eventObject) {
+		console.error(`Event with ID ${event.id} not found`);
+		throw new HTTPException(404, { message: `Event with ID ${event.id} not found` });
+	}
+
 	let newEvent = event.deepCopy() as com.earthapp.event.Event;
 
 	try {
@@ -307,12 +317,6 @@ export async function patchEvent(event: com.earthapp.event.Event, data: Partial<
 		);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to patch event: ${error instanceof Error ? error.message : 'Unknown error'}` });
-	}
-
-	const eventObject = await getEventById(event.id, d1);
-	if (!eventObject) {
-		console.error(`Event with ID ${event.id} not found`);
-		throw new HTTPException(404, { message: `Event with ID ${event.id} not found` });
 	}
 
 	eventObject.event = newEvent;

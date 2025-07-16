@@ -93,29 +93,48 @@ createEvent.post(
 			);
 		}
 
-		const owner = await getOwnerOfBearer(c);
-		if (!owner) {
+		try {
+			const owner = await getOwnerOfBearer(c);
+			if (!owner) {
+				return c.json(
+					{
+						code: 401,
+						message: 'Unauthorized'
+					},
+					401
+				);
+			}
+
+			const event = events.createEvent(owner.database.id, (event) => {
+				event.name = name;
+				event.description = description || '';
+				event.type = type;
+				event.location = new com.earthapp.event.Location(location.latitude, location.longitude);
+				event.date = date;
+				event.endDate = end_date || date;
+				event.visibility = com.earthapp.Visibility.valueOf(visibility);
+			});
+			if (!event) {
+				return c.json(
+					{
+						code: 500,
+						message: 'Failed to create event'
+					},
+					500
+				);
+			}
+
+			const obj = await events.saveEvent(event, c.env.DB);
+			return c.json(obj.public, 201);
+		} catch (error) {
 			return c.json(
 				{
-					code: 401,
-					message: 'Unauthorized'
+					code: 500,
+					message: `Failed to create event: ${error}`
 				},
-				401
+				500
 			);
 		}
-
-		const event = events.createEvent(owner.database.id, (event) => {
-			event.name = name;
-			event.description = description || '';
-			event.type = type;
-			event.location = new com.earthapp.event.Location(location.latitude, location.longitude);
-			event.date = date;
-			event.endDate = end_date || date;
-			event.visibility = com.earthapp.Visibility.valueOf(visibility);
-		});
-
-		const obj = await events.saveEvent(event, c.env.DB);
-		return c.json(obj.public, 201);
 	}
 );
 
