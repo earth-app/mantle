@@ -279,6 +279,29 @@ export const event = z
 	});
 export const events = z.array(event);
 
+export const activity = z
+	.object({
+		id: z.string().openapi({ example: 'hiking' }),
+		name: text,
+		description: text.optional(),
+		types: z.array(activityType).openapi({
+			example: ['HOBBY', 'SPORT']
+		}),
+		created_at: date,
+		updated_at: date.optional()
+	})
+	.openapi({
+		example: {
+			id: 'hiking',
+			name: 'Hiking',
+			description: 'A fun outdoor activity',
+			types: ['HOBBY', 'SPORT'],
+			created_at: '2025-05-11T10:00:00Z',
+			updated_at: '2025-05-11T12:00:00Z'
+		}
+	});
+export const activities = z.array(activity);
+
 // Reponse Schemas
 
 export const badRequest = {
