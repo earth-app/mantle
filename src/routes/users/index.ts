@@ -13,6 +13,7 @@ import loginUser from './login';
 import user from './user';
 
 // Implementation
+import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { bearerAuthMiddleware } from '../../util/authentication';
 import { getUsers } from '../../util/routes/users';
@@ -24,42 +25,7 @@ users.get(
 	describeRoute({
 		summary: 'Retrieve a paginated list of all users',
 		description: 'Gets a paginated list of all users in the Earth App.',
-		parameters: [
-			{
-				name: 'page',
-				in: 'query',
-				description: 'Page number (default: 1)',
-				required: false,
-				schema: {
-					type: 'integer',
-					minimum: 1,
-					default: 1
-				}
-			},
-			{
-				name: 'limit',
-				in: 'query',
-				description: 'Number of items per page (default: 25, max: 100)',
-				required: false,
-				schema: {
-					type: 'integer',
-					minimum: 1,
-					maximum: 100,
-					default: 25
-				}
-			},
-			{
-				name: 'search',
-				in: 'query',
-				description: 'Search query for usernames (max 40 characters)',
-				required: false,
-				schema: {
-					type: 'string',
-					maxLength: 40,
-					default: ''
-				}
-			}
-		],
+		parameters: schemas.paginatedParameters,
 		responses: {
 			200: {
 				description: 'List of users',
@@ -204,7 +170,9 @@ users.get(
 				schema: {
 					type: 'string',
 					description: 'Unique identifier for the user',
-					example: 'eb9137b1272938'
+					minLength: com.earthapp.util.ID_LENGTH,
+					maxLength: com.earthapp.util.ID_LENGTH,
+					example: 'audyrehwJd9wjfoz98enfoaw'
 				}
 			}
 		],
@@ -306,11 +274,7 @@ users.get(
 				name: 'username',
 				in: 'path',
 				required: true,
-				schema: {
-					type: 'string',
-					description: 'Username of the user, beginning with "@"',
-					example: '@john_doe'
-				}
+				schema: schemas.usernameParam
 			}
 		],
 		responses: {
@@ -341,6 +305,14 @@ users.patch(
 		summary: 'Updates a user by username',
 		description: 'Updates the user based on the provided username. The username should begin with "@"',
 		security: [{ BearerAuth: [] }],
+		parameters: [
+			{
+				name: 'username',
+				in: 'path',
+				required: true,
+				schema: schemas.usernameParam
+			}
+		],
 		requestBody: {
 			description: 'User object partial',
 			required: true,
@@ -380,6 +352,14 @@ users.delete(
 		summary: 'Deletes a user by username',
 		description: 'Deletes the user based on the provided username. The username should begin with "@"',
 		security: [{ BearerAuth: [] }],
+		parameters: [
+			{
+				name: 'username',
+				in: 'path',
+				required: true,
+				schema: schemas.usernameParam
+			}
+		],
 		responses: {
 			204: {
 				description: 'User deleted successfully'

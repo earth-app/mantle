@@ -21,42 +21,7 @@ activities.get(
 	describeRoute({
 		summary: 'Retrieve a paginated list of activities',
 		description: 'Gets a list of activities in the Earth App.',
-		parameters: [
-			{
-				name: 'page',
-				in: 'query',
-				description: 'Page number (default: 1)',
-				required: false,
-				schema: {
-					type: 'integer',
-					minimum: 1,
-					default: 1
-				}
-			},
-			{
-				name: 'limit',
-				in: 'query',
-				description: 'Number of items per page (default: 25, max: 100)',
-				required: false,
-				schema: {
-					type: 'integer',
-					minimum: 1,
-					maximum: 100,
-					default: 25
-				}
-			},
-			{
-				name: 'search',
-				in: 'query',
-				description: 'Search query for activity names (max 40 characters)',
-				required: false,
-				schema: {
-					type: 'string',
-					maxLength: 40,
-					default: ''
-				}
-			}
-		],
+		parameters: schemas.paginatedParameters,
 		responses: {
 			200: {
 				description: 'List of activities',

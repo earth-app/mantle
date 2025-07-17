@@ -1,0 +1,100 @@
+import { Hono } from 'hono';
+
+import { describeRoute } from 'hono-openapi';
+import { resolver } from 'hono-openapi/zod';
+import * as schemas from '../../../openapi/schemas';
+import * as tags from '../../../openapi/tags';
+
+// Implementation
+import { com } from '@earth-app/ocean';
+import Bindings from '../../../bindings';
+import { bearerAuthMiddleware } from '../../../util/authentication';
+import { getActivityById } from '../../../util/routes/activities';
+import { getUserFromContext, updateUser } from '../../../util/routes/users';
+
+const addUserActivity = new Hono<{ Bindings: Bindings }>();
+
+addUserActivity.put(
+	'/',
+	describeRoute({
+		summary: 'Add an activity to a user',
+		description: 'Associates an activity with a user in the Earth App.',
+		parameters: [
+			{
+				name: 'activityId',
+				in: 'query',
+				description: 'ID of the activity to add',
+				required: true,
+				schema: resolver(schemas.id)
+			}
+		],
+		responses: {
+			200: {
+				description: 'Activity added successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest,
+			404: {
+				description: 'User or Activity not found'
+			}
+		},
+		tags: [tags.USERS]
+	}),
+	bearerAuthMiddleware(),
+	async (c) => {
+		const activityId = c.req.query('activityId');
+		if (!activityId || activityId.length !== com.earthapp.util.ID_LENGTH) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Activity ID is required'
+				},
+				400
+			);
+		}
+
+		const res = await getUserFromContext(c);
+		if (!res.data) {
+			return c.json(
+				{
+					code: res.status,
+					message: res.message
+				},
+				res.status
+			);
+		}
+
+		const activity = await getActivityById(activityId, c.env.DB);
+		if (!activity) {
+			return c.json(
+				{
+					code: 404,
+					message: `Activity with ID ${activityId} not found`
+				},
+				404
+			);
+		}
+
+		try {
+			const user = res.data;
+			user.account.addActivity(activity.activity);
+
+			await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
+			return c.json(user.public, 200);
+		} catch (error) {
+			return c.json(
+				{
+					code: 400,
+					message: `Failed to add activity: ${error instanceof Error ? error.message : 'Unknown error'}`
+				},
+				400
+			);
+		}
+	}
+);
+
+export default addUserActivity;

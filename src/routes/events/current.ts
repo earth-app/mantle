@@ -19,42 +19,7 @@ currentEvent.get(
 		summary: 'Retrieve all events that the current user is attending',
 		security: [{ BearerAuth: [] }],
 		description: 'Gets all events that the current user is attending.',
-		parameters: [
-			{
-				name: 'page',
-				in: 'query',
-				description: 'Page number (default: 1)',
-				required: false,
-				schema: {
-					type: 'integer',
-					minimum: 1,
-					default: 1
-				}
-			},
-			{
-				name: 'limit',
-				in: 'query',
-				description: 'Number of items per page (default: 25, max: 100)',
-				required: false,
-				schema: {
-					type: 'integer',
-					minimum: 1,
-					maximum: 100,
-					default: 25
-				}
-			},
-			{
-				name: 'search',
-				in: 'query',
-				description: 'Search query for usernames (max 40 characters)',
-				required: false,
-				schema: {
-					type: 'string',
-					maxLength: 40,
-					default: ''
-				}
-			}
-		],
+		parameters: schemas.paginatedParameters,
 		responses: {
 			200: {
 				description: 'Event details',
@@ -250,11 +215,7 @@ currentEvent.post(
 				in: 'query',
 				description: 'ID of the event to cancel signup for',
 				required: true,
-				schema: {
-					type: 'string',
-					maxLength: com.earthapp.util.ID_LENGTH,
-					minLength: com.earthapp.util.ID_LENGTH
-				}
+				schema: resolver(schemas.id)
 			}
 		],
 		responses: {

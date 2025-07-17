@@ -1,8 +1,10 @@
 import { com } from '@earth-app/ocean';
 import { resolver } from 'hono-openapi/zod';
+import type { OpenAPIV3 } from 'openapi-types';
 import z from 'zod';
 import 'zod-openapi/extend';
 
+import { DescribeRouteOptions } from 'hono-openapi';
 import { LoginUser } from '../types/users';
 
 // Root Types
@@ -30,13 +32,58 @@ export function paginated(schema: z.ZodTypeAny) {
 	});
 }
 
+export const paginatedParameters = [
+	{
+		name: 'page',
+		in: 'query',
+		description: 'Page number (default: 1)',
+		required: false,
+		schema: {
+			type: 'integer',
+			minimum: 1,
+			default: 1
+		}
+	},
+	{
+		name: 'limit',
+		in: 'query',
+		description: 'Number of items per page (default: 25, max: 100)',
+		required: false,
+		schema: {
+			type: 'integer',
+			minimum: 1,
+			maximum: 100,
+			default: 25
+		}
+	},
+	{
+		name: 'search',
+		in: 'query',
+		description: 'Search query (max 40 characters)',
+		required: false,
+		schema: {
+			type: 'string',
+			maxLength: 40,
+			default: ''
+		}
+	}
+] satisfies DescribeRouteOptions['parameters'];
+
 // String Types
 export const text = z.string().openapi({ example: 'Hello World' });
-export const id = z.string().length(com.earthapp.util.ID_LENGTH).openapi({ example: 'eb9137b1272938' });
+export const id = z.string().length(com.earthapp.util.ID_LENGTH).openapi({ example: 'ebfjwHLdiqBudn3eyd83g1bs' });
 export const username = z.string().min(4).max(20).openapi({ example: 'johndoe' });
 export const password = z.string().min(8).max(100).openapi({ example: 'password123' });
 export const email = z.string().email().openapi({ example: 'me@company.com' });
 export const date = z.string().datetime().openapi({ example: '2025-05-11T10:00:00Z' });
+
+export const usernameParam = {
+	type: 'string',
+	minLength: 5,
+	maxLength: 21,
+	pattern: '^@([a-zA-Z0-9_]{3,20})$',
+	example: '@johndoe'
+} satisfies OpenAPIV3.ParameterObject['schema'];
 
 // Enum Types
 export const activityType = z
@@ -54,6 +101,11 @@ export const userPrivacy = z
 export const eventType = z
 	.enum(com.earthapp.event.EventType.values().map((v) => v.name) as [string, ...string[]])
 	.openapi({ example: 'IN_PERSON' });
+
+// Array Types
+export const idArray = z.array(id).openapi({
+	example: ['eb9137b1272938', 'audyrehwJd9wjfoz98enfoaw']
+});
 
 // Objects
 

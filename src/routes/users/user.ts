@@ -1,13 +1,16 @@
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
+import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
+// User Routes
+import userActivities from './activities';
+
 import { com } from '@earth-app/ocean';
-import { ContentfulStatusCode } from 'hono/utils/http-status';
 import Bindings from '../../bindings';
 import { User, UserObject } from '../../types/users';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer } from '../../util/authentication';
@@ -98,7 +101,7 @@ user.patch('/', bearerAuthMiddleware(), async (c) => {
 				code: res.status,
 				message: res.message
 			},
-			res.status as ContentfulStatusCode
+			res.status
 		);
 	}
 
@@ -126,7 +129,7 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 				code: res.status,
 				message: res.message
 			},
-			res.status as ContentfulStatusCode
+			res.status
 		);
 	}
 	const user = res.data;
@@ -176,7 +179,7 @@ user.patch(
 				description: 'User visibility updated successfully',
 				content: {
 					'application/json': {
-						schema: zodToJsonSchema(schemas.user) as OpenAPIV3.SchemaObject
+						schema: resolver(schemas.user)
 					}
 				}
 			},
@@ -215,7 +218,7 @@ user.patch(
 					code: res.status,
 					message: res.message
 				},
-				res.status as ContentfulStatusCode
+				res.status
 			);
 		}
 
@@ -239,5 +242,7 @@ user.patch(
 		return c.json(updated, 200);
 	}
 );
+
+user.route('/activities', userActivities);
 
 export default user;
