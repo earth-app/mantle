@@ -38,6 +38,8 @@ addUserActivity.put(
 				}
 			},
 			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
 			404: {
 				description: 'User or Activity not found'
 			}
