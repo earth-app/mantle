@@ -9,6 +9,7 @@ import * as util from '../util';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
+import { ContentfulStatusCode } from 'hono/utils/http-status';
 
 // Helpers
 
@@ -148,7 +149,7 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 
 // Update User Function
 
-async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings) {
+export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings): Promise<UserObject> {
 	await checkTableExists(bindings.DB);
 
 	const data = new Uint8Array(user.account.toBinary());
@@ -167,6 +168,8 @@ async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.account.P
 	if (!res.success) throw new HTTPException(400, { message: `Database error: ${res.error}` });
 
 	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
+
+	return user;
 }
 
 async function findUser(query: string, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings, ...params: any[]) {
@@ -204,7 +207,11 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 
 // Routing utilities
 
-export async function getUserFromContext(c: Context<{ Bindings: Bindings }>) {
+export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Promise<{
+	data: UserObject | null;
+	message: string;
+	status: ContentfulStatusCode;
+}> {
 	const bearerToken = c.req.header('Authorization');
 	if (!bearerToken || !bearerToken.startsWith('Bearer ')) {
 		return { data: null, message: 'Unauthorized', status: 401 };
