@@ -8,15 +8,18 @@
     "prettier:check": "bunx prettier --check .",
     "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy --minify",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20250709.0",
-    "@earth-app/ocean": "1.0.0-0ce284a",
+    "@cloudflare/workers-types": "^4.20250718.0",
+    "@earth-app/ocean": "1.0.0-0dae038",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.2",
-    "@hono/zod-validator": "^0.7.0",
-    "hono": "^4.8.4",
+    "@hono/zod-validator": "^0.7.1",
+    "hono": "^4.8.5",
     "hono-openapi": "^0.4.8",
     "hono-rate-limiter": "^0.4.2",
     "zod": "^3.25.76",
@@ -24,10 +27,12 @@
     "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.55",
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
     "prettier-plugin-organize-imports": "^4.1.0",
-    "wrangler": "^4.24.0"
+    "vitest": "~3.2.4",
+    "wrangler": "^4.25.0"
   },
   "lint-staged": {
     "*.{js,ts,json,yml}": "prettier --write"
