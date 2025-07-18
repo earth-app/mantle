@@ -66,6 +66,7 @@ export type User = {
 			description?: string;
 			activity_types: (typeof com.earthapp.activity.ActivityType.prototype.name)[];
 		}[];
+		friends: string[];
 	};
 };
 
@@ -134,6 +135,11 @@ export function toUser(
 	// Activities
 	if (data.isFieldPrivate('activities', privacy)) {
 		user.account.activities = [];
+	}
+
+	// Friends
+	if (data.isFieldPrivate('friends', privacy)) {
+		user.account.friends = [];
 	}
 
 	return user;
