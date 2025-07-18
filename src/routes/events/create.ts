@@ -10,12 +10,14 @@ import * as tags from '../../openapi/tags';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer } from '../../util/authentication';
+import { kvUserRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import * as events from '../../util/routes/events';
 
 const createEvent = new Hono<{ Bindings: Bindings }>();
 
 createEvent.post(
 	'/',
+	kvUserRateLimit(rateLimitConfigs.eventCreate),
 	describeRoute({
 		summary: 'Create a new event',
 		description: 'Creates a new event within the Earth App',

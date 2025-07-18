@@ -14,6 +14,8 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { User, UserObject } from '../../types/users';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer } from '../../util/authentication';
+import { kvUserRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { rateLimit } from '../../util/ratelimit';
 import { deleteUser, getUserById, getUserByUsername, getUserFromContext, patchUser } from '../../util/routes/users';
 
 const user = new Hono<{ Bindings: Bindings }>();
@@ -71,54 +73,60 @@ user.get('/', async (c) => {
 });
 
 // Patch User
-user.patch('/', bearerAuthMiddleware(), async (c) => {
-	const rawBody = await c.req.text();
-	if (!rawBody) {
-		return c.json(
-			{
-				code: 400,
-				message: 'Request body cannot be empty'
-			},
-			400
-		);
+user.patch(
+	'/',
+	kvUserRateLimit(rateLimitConfigs.userUpdate),
+	rateLimit(true), // Authenticated rate limiting
+	bearerAuthMiddleware(),
+	async (c) => {
+		const rawBody = await c.req.text();
+		if (!rawBody) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Request body cannot be empty'
+				},
+				400
+			);
+		}
+
+		let data: DeepPartial<User['account']> = await c.req.json();
+		if (!data || typeof data !== 'object') {
+			return c.json(
+				{
+					code: 400,
+					message: 'Invalid request body'
+				},
+				400
+			);
+		}
+
+		const res = await getUserFromContext(c);
+		if (!res.data) {
+			return c.json(
+				{
+					code: res.status,
+					message: res.message
+				},
+				res.status
+			);
+		}
+
+		const user = res.data;
+
+		if (data.type || data.id) {
+			data = {
+				...data,
+				type: undefined, // Prevent type changes
+				id: undefined // Prevent ID changes
+			};
+		}
+
+		// Update user properties
+		const returned = await patchUser(user.account, c.env, data);
+		return c.json(returned, 200);
 	}
-
-	let data: DeepPartial<User['account']> = await c.req.json();
-	if (!data || typeof data !== 'object') {
-		return c.json(
-			{
-				code: 400,
-				message: 'Invalid request body'
-			},
-			400
-		);
-	}
-
-	const res = await getUserFromContext(c);
-	if (!res.data) {
-		return c.json(
-			{
-				code: res.status,
-				message: res.message
-			},
-			res.status
-		);
-	}
-
-	const user = res.data;
-
-	if (data.type || data.id) {
-		data = {
-			...data,
-			type: undefined, // Prevent type changes
-			id: undefined // Prevent ID changes
-		};
-	}
-
-	// Update user properties
-	const returned = await patchUser(user.account, c.env, data);
-	return c.json(returned, 200);
-});
+);
 
 // Delete User
 user.delete('/', bearerAuthMiddleware(), async (c) => {

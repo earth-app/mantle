@@ -6,11 +6,16 @@ import * as tags from '../../openapi/tags';
 
 import Bindings from '../../bindings';
 import { basicAuthMiddleware } from '../../util/authentication';
+import { kvRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { rateLimit } from '../../util/ratelimit';
 import { loginUser } from '../../util/routes/users';
 import { getCredentials } from '../../util/util';
 
 const login = new Hono<{ Bindings: Bindings }>();
 
+// Apply rate limiting before authentication
+login.use(kvRateLimit(rateLimitConfigs.userLogin));
+login.use(rateLimit(false)); // Anonymous rate limiting
 login.use(basicAuthMiddleware());
 login.post(
 	'/',

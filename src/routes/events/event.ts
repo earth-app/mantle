@@ -11,6 +11,7 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { Event } from '../../types/events';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
+import { kvUserRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { deleteEvent, getEventById, patchEvent } from '../../util/routes/events';
 
 const event = new Hono<{ Bindings: Bindings }>();
@@ -98,6 +99,7 @@ event.get(
 // Update Event
 event.patch(
 	'/',
+	kvUserRateLimit(rateLimitConfigs.eventUpdate),
 	describeRoute({
 		summary: 'Update an event',
 		description: 'Updates an existing event by its ID.',
@@ -296,7 +298,7 @@ event.delete(
 			);
 		}
 		const owner = await getOwnerOfToken(token, c.env);
-		if (token !== c.env.ADMIN_API_KEY && (!owner || owner.account.id !== event.event.hostId)) {
+		if (token !== c.env.ADMIN_API_KEY && (!owner || owner.account.id !== event.event.hostId || !owner.account.isAdmin)) {
 			return c.json(
 				{
 					code: 403,
