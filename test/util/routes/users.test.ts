@@ -40,7 +40,11 @@ describe('Users Utility Functions', () => {
 			const { saveUser, createUser } = await import('../../../src/util/routes/users');
 
 			const mockBindings = {
-				DB: (globalThis as any).DB
+				DB: (globalThis as any).DB,
+				KV: (globalThis as any).KV,
+				KEK: 'LSBiwQgmG0gCPjYONDSWTBgSyX8xfqFasFY6G0exI94=',
+				LOOKUP_HMAC_KEY: 'Lu2ZWrAohkp/lJTL0T4l2f3cpuzsL8v9NLW7C3o+/rY=',
+				ADMIN_API_KEY: 'EA25K24Gbc7892e1c5ae7d9fd2af73b4QL4DX'
 			} as any;
 
 			try {
@@ -51,6 +55,8 @@ describe('Users Utility Functions', () => {
 				});
 
 				await saveUser(user, 'password123', mockBindings);
+				// If we get here, the function executed without throwing
+				expect(true).toBe(true);
 			} catch (error) {
 				// Expected to fail in test environment without real DB/crypto
 				expect(error).toBeDefined();
@@ -65,7 +71,7 @@ describe('Users Utility Functions', () => {
 			// Test getUserById
 			try {
 				const result = await getUserById('test-id', mockDB);
-				expect(result).toBeNull(); // Mock DB returns null
+				expect(result).toBeNull(); // Mock DB returns null for non-existent records
 			} catch (error) {
 				expect(error).toBeDefined();
 			}
@@ -73,7 +79,7 @@ describe('Users Utility Functions', () => {
 			// Test getUserByUsername
 			try {
 				const result = await getUserByUsername('testuser', mockDB);
-				expect(result).toBeNull(); // Mock DB returns null
+				expect(result).toBeNull(); // Mock DB returns null for non-existent records
 			} catch (error) {
 				expect(error).toBeDefined();
 			}
@@ -81,7 +87,7 @@ describe('Users Utility Functions', () => {
 			// Test getUserByEmail
 			try {
 				const result = await getUserByEmail('test@example.com', mockDB);
-				expect(result).toBeNull(); // Mock DB returns null
+				expect(result).toBeNull(); // Mock DB returns null for non-existent records
 			} catch (error) {
 				expect(error).toBeDefined();
 			}

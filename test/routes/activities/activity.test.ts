@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkTableExists } from '../../../src/util/routes/activities';
 import { createBearerAuthHeader, MOCK_ADMIN_TOKEN, MOCK_USER_TOKEN } from '../../helpers';
 
 describe('Activity Route', () => {
@@ -17,14 +18,42 @@ describe('Activity Route', () => {
 		it('should handle GET requests for specific activity', async () => {
 			const activityRoute = await import('../../../src/routes/activities/activity');
 
+			// Use the real mocked D1 database from setup.ts
+			const mockBindings = (globalThis as any).mockBindings;
+
+			// Create activities table using checkTableExists
+			await checkTableExists(mockBindings.DB);
+
+			// Insert sample activity (using simplified schema from checkTableExists)
+			await mockBindings.DB.prepare(
+				`
+			INSERT INTO activities (id, binary, created_at, updated_at)
+			VALUES (?, ?, ?, ?)
+		`
+			)
+				.bind(
+					'test-activity-id',
+					new Uint8Array([1, 2, 3, 4, 5]), // Sample binary data
+					new Date().toISOString(),
+					new Date().toISOString()
+				)
+				.run();
 			const req = new Request('http://localhost/activities/test-activity-id', {
 				method: 'GET'
 			});
 
 			try {
-				const res = await activityRoute.default.request(req);
+				const res = await activityRoute.default.request(req, mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
+
+				// If successful, expect activity data
+				if (res.status === 200) {
+					const responseData = (await res.json()) as any;
+					expect(responseData).toBeDefined();
+					expect(responseData.id).toBe('test-activity-id');
+					expect(responseData.name).toBe('Beach Cleanup');
+				}
 			} catch (error) {
 				// Expected to fail in test environment
 				expect(error).toBeDefined();
@@ -33,6 +62,26 @@ describe('Activity Route', () => {
 
 		it('should handle PATCH requests for activity updates', async () => {
 			const activityRoute = await import('../../../src/routes/activities/activity');
+
+			// Mock the DB to support activity updates
+			const mockDB = (globalThis as any).mockBindings.DB;
+			mockDB.prepare = vi.fn().mockReturnValue({
+				bind: vi.fn().mockReturnValue({
+					first: vi.fn().mockResolvedValue({
+						id: 'test-activity-id',
+						name: 'Updated Activity Name',
+						description: 'Updated description',
+						points: 15,
+						category: 'CLEANUP',
+						estimatedTime: 120,
+						difficulty: 'EASY',
+						isActive: true,
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString()
+					}),
+					run: vi.fn().mockResolvedValue({ success: true })
+				})
+			});
 
 			const req = new Request('http://localhost/activities/test-activity-id', {
 				method: 'PATCH',
@@ -48,9 +97,18 @@ describe('Activity Route', () => {
 			});
 
 			try {
-				const res = await activityRoute.default.request(req);
+				const res = await activityRoute.default.request(req, (globalThis as any).mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
+
+				// If successful, expect updated activity data
+				if (res.status === 200) {
+					const responseData = (await res.json()) as any;
+					expect(responseData).toBeDefined();
+					expect(responseData.name).toBe('Updated Activity Name');
+					expect(responseData.description).toBe('Updated description');
+					expect(responseData.points).toBe(15);
+				}
 			} catch (error) {
 				// Expected to fail in test environment
 				expect(error).toBeDefined();

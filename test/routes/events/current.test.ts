@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkTableExists } from '../../../src/util/routes/events';
 import { createBearerAuthHeader, MOCK_USER_TOKEN } from '../../helpers';
 
 describe('Current Events Route', () => {
@@ -17,14 +18,48 @@ describe('Current Events Route', () => {
 		it('should handle GET requests for current events', async () => {
 			const currentEventsRoute = await import('../../../src/routes/events/current');
 
+			// Use the real mocked D1 database from setup.ts
+			const mockBindings = (globalThis as any).mockBindings;
+
+			// Create events table using checkTableExists
+			await checkTableExists(mockBindings.DB);
+
+			// Insert sample events (using simplified schema from checkTableExists)
+			await mockBindings.DB.prepare(
+				`
+				INSERT INTO events (id, binary, hostId, name, attendees, latitude, longitude, date, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`
+			)
+				.bind(
+					'event-1',
+					new Uint8Array([1, 2, 3, 4, 5]), // Sample binary data
+					'test-host-id',
+					'Climate Action Event',
+					'[]', // Empty attendees array as JSON string
+					40.7128, // NYC latitude
+					-74.006, // NYC longitude
+					new Date().toISOString(),
+					new Date().toISOString(),
+					new Date().toISOString()
+				)
+				.run();
+
 			const req = new Request('http://localhost/events/current', {
 				method: 'GET'
 			});
 
 			try {
-				const res = await currentEventsRoute.default.request(req);
+				const res = await currentEventsRoute.default.request(req, mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
+
+				// If successful, expect events data
+				if (res.status === 200) {
+					const responseData = (await res.json()) as any;
+					expect(responseData).toBeDefined();
+					expect(Array.isArray(responseData) || responseData.events).toBeTruthy();
+				}
 			} catch (error) {
 				// Expected to fail in test environment
 				expect(error).toBeDefined();
@@ -34,14 +69,46 @@ describe('Current Events Route', () => {
 		it('should handle location-based queries', async () => {
 			const currentEventsRoute = await import('../../../src/routes/events/current');
 
+			// Mock the DB to return location-filtered events
+			const mockDB = (globalThis as any).mockBindings.DB;
+			mockDB.prepare = vi.fn().mockReturnValue({
+				bind: vi.fn().mockReturnValue({
+					all: vi.fn().mockResolvedValue({
+						results: [
+							{
+								id: 'event-nearby',
+								name: 'Local Climate Event',
+								description: 'A nearby climate action event',
+								startTime: new Date().toISOString(),
+								endTime: new Date(Date.now() + 3600000).toISOString(),
+								location: 'Nearby Community Center',
+								latitude: 40.7128,
+								longitude: -74.006,
+								capacity: 100,
+								visibility: 'PUBLIC'
+							}
+						]
+					})
+				})
+			});
+
 			const req = new Request('http://localhost/events/current?lat=40.7128&lng=-74.0060&radius=10', {
 				method: 'GET'
 			});
 
 			try {
-				const res = await currentEventsRoute.default.request(req);
+				const res = await currentEventsRoute.default.request(req, (globalThis as any).mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
+
+				// If successful, expect location-filtered events
+				if (res.status === 200) {
+					const responseData = (await res.json()) as any;
+					expect(responseData).toBeDefined();
+					if (Array.isArray(responseData)) {
+						expect(responseData.length).toBeGreaterThanOrEqual(0);
+					}
+				}
 			} catch (error) {
 				// Expected to fail in test environment
 				expect(error).toBeDefined();

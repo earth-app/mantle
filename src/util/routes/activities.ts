@@ -39,7 +39,7 @@ function toActivityObject(activity: DBActivity): ActivityObject {
 	};
 }
 
-async function checkTableExists(d1: D1Database) {
+export async function checkTableExists(d1: D1Database) {
 	const query = `CREATE TABLE IF NOT EXISTS activities (
 		id TEXT PRIMARY KEY NOT NULL UNIQUE,
 		binary BLOB NOT NULL,

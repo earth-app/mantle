@@ -1,6 +1,10 @@
+import { mockD1Database } from '@variablesoftware/mock-d1';
+import { mockKVNamespace } from '@variablesoftware/mock-kv';
 import { beforeEach, vi } from 'vitest';
+
 (globalThis as any).process = (globalThis as any).process || {
 	env: {
+		// .dev.vars
 		KEK: 'LSBiwQgmG0gCPjYONDSWTBgSyX8xfqFasFY6G0exI94=',
 		LOOKUP_HMAC_KEY: 'Lu2ZWrAohkp/lJTL0T4l2f3cpuzsL8v9NLW7C3o+/rY=',
 		ADMIN_API_KEY: 'EA25K24Gbc7892e1c5ae7d9fd2af73b4QL4DX'
@@ -9,29 +13,15 @@ import { beforeEach, vi } from 'vitest';
 
 // Create a comprehensive mock for Cloudflare Workers bindings
 const createMockBindings = () => ({
-	DB: {
-		prepare: vi.fn((query: string) => ({
-			bind: vi.fn((...args: unknown[]) => ({
-				run: vi.fn().mockResolvedValue({ success: true }),
-				first: vi.fn().mockResolvedValue(null),
-				all: vi.fn().mockResolvedValue({ results: [] })
-			})),
-			run: vi.fn().mockResolvedValue({ success: true }),
-			first: vi.fn().mockResolvedValue(null),
-			all: vi.fn().mockResolvedValue({ results: [] })
-		}))
-	},
-	KV: {
-		get: vi.fn().mockResolvedValue(null),
-		put: vi.fn().mockResolvedValue(undefined),
-		delete: vi.fn().mockResolvedValue(undefined)
-	},
+	DB: mockD1Database(),
+	KV: mockKVNamespace(),
 	ANONYMOUS_RATE_LIMIT: {
 		limit: vi.fn().mockResolvedValue({ success: true })
 	},
 	AUTH_RATE_LIMIT: {
 		limit: vi.fn().mockResolvedValue({ success: true })
 	},
+	// .dev.vars
 	KEK: 'LSBiwQgmG0gCPjYONDSWTBgSyX8xfqFasFY6G0exI94=',
 	LOOKUP_HMAC_KEY: 'Lu2ZWrAohkp/lJTL0T4l2f3cpuzsL8v9NLW7C3o+/rY=',
 	ADMIN_API_KEY: 'EA25K24Gbc7892e1c5ae7d9fd2af73b4QL4DX'
@@ -39,7 +29,10 @@ const createMockBindings = () => ({
 
 // Add mock bindings to global context
 beforeEach(() => {
-	(globalThis as any).mockBindings = createMockBindings();
+	const mockBindings = createMockBindings();
+	(globalThis as any).mockBindings = mockBindings;
+	(globalThis as any).DB = mockBindings.DB;
+	(globalThis as any).KV = mockBindings.KV;
 });
 
 // Mock Cloudflare Workers runtime modules
@@ -133,23 +126,6 @@ beforeEach(() => {
 			return result;
 		};
 	}
-
-	// Mock D1 Database
-	const mockD1 = {
-		prepare: vi.fn().mockReturnValue({
-			bind: vi.fn().mockReturnValue({
-				first: vi.fn().mockResolvedValue(null),
-				all: vi.fn().mockResolvedValue({ results: [] }),
-				run: vi.fn().mockResolvedValue({ success: true })
-			}),
-			first: vi.fn().mockResolvedValue(null),
-			all: vi.fn().mockResolvedValue({ results: [] }),
-			run: vi.fn().mockResolvedValue({ success: true })
-		}),
-		exec: vi.fn().mockResolvedValue([])
-	};
-
-	(globalThis as any).DB = mockD1;
 
 	// Mock rate limiters
 	(globalThis as any).ANONYMOUS_RATE_LIMIT = {

@@ -28,14 +28,53 @@ describe('Event Create Route', () => {
 
 		it('should handle POST requests for event creation', async () => {
 			try {
-				const mockContext = createMockContext({
+				// Use the real mocked D1 database from setup.ts
+				const mockBindings = (globalThis as any).mockBindings;
+
+				// Create events table and users table
+				await mockBindings.DB.exec(`
+					CREATE TABLE IF NOT EXISTS events (
+						id TEXT PRIMARY KEY,
+						name TEXT NOT NULL,
+						description TEXT,
+						startTime TEXT NOT NULL,
+						endTime TEXT,
+						location TEXT,
+						latitude REAL,
+						longitude REAL,
+						capacity INTEGER,
+						visibility TEXT DEFAULT 'PUBLIC',
+						createdBy TEXT NOT NULL,
+						created_at TEXT NOT NULL
+					)
+				`);
+
+				await mockBindings.DB.exec(`
+					CREATE TABLE IF NOT EXISTS users (
+						id TEXT PRIMARY KEY,
+						username TEXT UNIQUE NOT NULL,
+						email TEXT UNIQUE NOT NULL,
+						created_at TEXT NOT NULL
+					)
+				`);
+
+				// Insert test user
+				await mockBindings.DB.prepare(
+					`
+					INSERT INTO users (id, username, email, created_at)
+					VALUES (?, ?, ?, ?)
+				`
+				)
+					.bind('test-user-id', 'testuser', 'test@example.com', new Date().toISOString())
+					.run();
+
+				const req = new Request('http://localhost/events/create', {
 					method: 'POST',
-					url: 'http://localhost/events/create',
 					headers: {
 						'Content-Type': 'application/json',
 						Authorization: createBearerAuthHeader(MOCK_USER_TOKEN)
 					},
-					body: {
+					body: JSON.stringify({
 						name: 'Climate Action Event',
 						description: 'A community event focused on climate action',
 						location: {
@@ -45,12 +84,20 @@ describe('Event Create Route', () => {
 						startTime: new Date().toISOString(),
 						endTime: new Date(Date.now() + 3600000).toISOString(),
 						capacity: 100
-					}
+					})
 				});
 
-				const res = await createEventRoute.request(mockContext.req, mockContext.env);
+				const res = await createEventRoute.request(req, mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
+
+				// If successful, expect event data
+				if (res.status === 201) {
+					const responseData = (await res.json()) as any;
+					expect(responseData).toBeDefined();
+					expect(responseData.name).toBe('Climate Action Event');
+					expect(responseData.description).toBe('A community event focused on climate action');
+				}
 			} catch (error) {
 				// Expected to fail in test environment
 				expect(error).toBeDefined();

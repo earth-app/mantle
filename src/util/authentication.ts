@@ -23,7 +23,7 @@ type TokenRow = {
 	expires_at: Date;
 };
 
-async function checkTableExists(d1: D1Database) {
+export async function checkTableExists(d1: D1Database) {
 	const query = `CREATE TABLE IF NOT EXISTS tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         owner TEXT NOT NULL,

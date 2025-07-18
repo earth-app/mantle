@@ -45,7 +45,7 @@ function toEventObject(event: DBEvent): EventObject {
 	};
 }
 
-async function checkTableExists(d1: D1Database) {
+export async function checkTableExists(d1: D1Database) {
 	const query = `CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY NOT NULL UNIQUE,
         binary BLOB NOT NULL,

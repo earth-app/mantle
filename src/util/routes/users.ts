@@ -57,7 +57,7 @@ async function toUserObject(row: DBUser, fieldPrivacy: com.earthapp.account.Priv
 	return { public: toUser(accountData, fieldPrivacy, row.created_at, row.updated_at, row.last_login), database: row, account: accountData };
 }
 
-async function checkTableExists(d1: D1Database) {
+export async function checkTableExists(d1: D1Database) {
 	const query = `CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY NOT NULL,
         username TEXT NOT NULL,
