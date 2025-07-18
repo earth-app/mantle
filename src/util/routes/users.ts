@@ -219,11 +219,13 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Pr
 
 	const token = bearerToken.slice(7);
 	const path = c.req.param('id');
+
 	let user: UserObject | null;
+	const owner = (user = await getOwnerOfToken(token, c.env));
 
 	// Current User
 	if (!path) {
-		user = await getOwnerOfToken(token, c.env);
+		user = owner;
 		if (!user) {
 			return {
 				data: null,
@@ -232,7 +234,7 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Pr
 			};
 		}
 	} else {
-		if (token !== c.env.ADMIN_API_KEY) {
+		if (!owner?.account.isAdmin && token !== c.env.ADMIN_API_KEY) {
 			return {
 				data: null,
 				message: 'Forbidden: You do not have permission to access this user.',

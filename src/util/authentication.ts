@@ -364,7 +364,9 @@ export function adminMiddleware() {
 	return bearerAuth({
 		verifyToken: async (token: string, c: Context<{ Bindings: Bindings }>) => {
 			if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
-			return token === c.env.ADMIN_API_KEY;
+
+			const owner = await getOwnerOfToken(token, c.env);
+			return token === c.env.ADMIN_API_KEY || owner?.account.isAdmin || false;
 		}
 	});
 }

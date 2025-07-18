@@ -26,7 +26,10 @@ export function getCredentials(basic: string) {
 
 	const base64Credentials = basic.slice(6);
 	const credentials = atob(base64Credentials);
-	return credentials.split(':', 2);
+	const colonIndex = credentials.indexOf(':');
+	if (colonIndex === -1) throw new Error('Invalid credentials format');
+
+	return [credentials.slice(0, colonIndex), credentials.slice(colonIndex + 1)];
 }
 
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
