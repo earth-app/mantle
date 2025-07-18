@@ -17,6 +17,10 @@ binding = "DB"
 database_name = "earth-app"
 database_id = "4c88abe1-6768-4f17-8cc6-8b8e41475a34"
 
+[[kv_namespaces]]
+binding = "KV"
+id = "322faefd5628471cb7cea08cf041804a"
+
 [[unsafe.bindings]]
 name = "ANONYMOUS_RATE_LIMIT"
 type = "ratelimit"
