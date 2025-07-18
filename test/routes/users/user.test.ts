@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBearerAuthHeader, MOCK_USER_TOKEN } from '../../helpers';
-import type { MockBindings, TestUser } from '../../types/test-types';
+import type { TestUser } from '../../types/test-types';
 
 describe('User Route', () => {
 	beforeEach(() => {
@@ -24,7 +24,7 @@ describe('User Route', () => {
 				const userRoute = await import('../../../src/routes/users/user');
 
 				// Use the real mocked D1 database from setup.ts
-				const mockBindings = (globalThis as any).mockBindings as MockBindings;
+				const mockBindings = (globalThis as any).mockBindings;
 
 				// Insert test user data into the mock database
 				await mockBindings.DB.exec(`

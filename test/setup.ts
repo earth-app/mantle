@@ -35,6 +35,10 @@ beforeEach(() => {
 	(globalThis as any).KV = mockBindings.KV;
 });
 
+// Also initialize mockBindings at startup
+const initialMockBindings = createMockBindings();
+(globalThis as any).mockBindings = initialMockBindings;
+
 // Mock Cloudflare Workers runtime modules
 vi.mock('cloudflare:workers', () => ({
 	default: {}

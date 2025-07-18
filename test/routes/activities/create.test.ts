@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkTableExists } from '../../../src/util/routes/activities';
 import { createBearerAuthHeader, MOCK_ADMIN_TOKEN, MOCK_USER_TOKEN } from '../../helpers';
 
 describe('Activity Create Route', () => {
@@ -18,12 +17,6 @@ describe('Activity Create Route', () => {
 		it('should handle POST requests for activity creation', async () => {
 			const createActivityRoute = await import('../../../src/routes/activities/create');
 
-			// Use the real mocked D1 database from setup.ts
-			const mockBindings = (globalThis as any).mockBindings;
-
-			// Create activities table using checkTableExists
-			await checkTableExists(mockBindings.DB);
-
 			const req = new Request('http://localhost/activities/create', {
 				method: 'POST',
 				headers: {
@@ -33,15 +26,12 @@ describe('Activity Create Route', () => {
 				body: JSON.stringify({
 					name: 'Recycling Activity',
 					description: 'An activity focused on recycling and waste reduction',
-					category: 'environment',
-					points: 10,
-					carbonImpact: -0.5,
 					types: ['RECYCLING', 'WASTE_REDUCTION']
 				})
 			});
 
 			try {
-				const res = await createActivityRoute.default.request(req, mockBindings);
+				const res = await createActivityRoute.default.request(req, (globalThis as any).mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
 
