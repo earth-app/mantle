@@ -85,6 +85,13 @@ export const usernameParam = {
 	example: '@johndoe'
 } satisfies OpenAPIV3.ParameterObject['schema'];
 
+export const idParam = {
+	type: 'string',
+	minLength: com.earthapp.util.ID_LENGTH,
+	maxLength: com.earthapp.util.ID_LENGTH,
+	example: 'eyb2cCNwc73b197cnsHbDqiU'
+} satisfies OpenAPIV3.ParameterObject['schema'];
+
 // Enum Types
 export const activityType = z
 	.enum(com.earthapp.activity.ActivityType.values().map((v) => v.name) as [string, ...string[]])
