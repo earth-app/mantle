@@ -9,7 +9,9 @@ import * as tags from '../../openapi/tags';
 
 // User Routes
 import userActivities from './activities';
+import userFriends from './friends';
 
+// Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { User, UserObject } from '../../types/users';
@@ -252,5 +254,6 @@ user.patch(
 );
 
 user.route('/activities', userActivities);
+user.route('/friends', userFriends);
 
 export default user;

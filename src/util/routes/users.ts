@@ -9,7 +9,6 @@ import * as util from '../util';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
-import { ContentfulStatusCode } from 'hono/utils/http-status';
 
 // Helpers
 
@@ -210,7 +209,7 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Promise<{
 	data: UserObject | null;
 	message: string;
-	status: ContentfulStatusCode;
+	status: 200 | 400 | 401 | 403 | 404;
 }> {
 	const bearerToken = c.req.header('Authorization');
 	if (!bearerToken || !bearerToken.startsWith('Bearer ')) {
@@ -218,10 +217,14 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Pr
 	}
 
 	const token = bearerToken.slice(7);
+	if (!token) {
+		return { data: null, message: 'Unauthorized: Invalid token', status: 401 };
+	}
+
 	const path = c.req.param('id');
 
 	let user: UserObject | null;
-	const owner = (user = await getOwnerOfToken(token, c.env));
+	const owner = await getOwnerOfToken(token, c.env);
 
 	// Current User
 	if (!path) {

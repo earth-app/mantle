@@ -13,10 +13,10 @@ import loginUser from './login';
 import user from './user';
 
 // Implementation
-import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { bearerAuthMiddleware } from '../../util/authentication';
 import { getUsers } from '../../util/routes/users';
+import { paginatedParameters } from '../../util/util';
 
 const users = new Hono<{ Bindings: Bindings }>();
 
@@ -40,39 +40,12 @@ users.get(
 		tags: [tags.USERS]
 	}),
 	async (c) => {
-		const page = c.req.query('page') ? parseInt(c.req.query('page')!) : 1;
-		const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 25;
-		const search = c.req.query('search') || '';
-
-		if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid pagination parameters'
-				},
-				400
-			);
+		const params = paginatedParameters(c);
+		if (params.code && params.message) {
+			return c.json({ code: params.code, message: params.message }, params.code);
 		}
 
-		if (limit > 100) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Limit cannot exceed 100'
-				},
-				400
-			);
-		}
-
-		if (search.length > 40) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Search query cannot exceed 40 characters'
-				},
-				400
-			);
-		}
+		const { page, limit, search } = params;
 
 		const users = (await getUsers(c.env, limit, page - 1, search)).map((user) => user.public);
 		return c.json(
@@ -165,15 +138,10 @@ users.get(
 		parameters: [
 			{
 				name: 'id',
+				description: 'User ID',
 				in: 'path',
 				required: true,
-				schema: {
-					type: 'string',
-					description: 'Unique identifier for the user',
-					minLength: com.earthapp.util.ID_LENGTH,
-					maxLength: com.earthapp.util.ID_LENGTH,
-					example: 'audyrehwJd9wjfoz98enfoaw'
-				}
+				schema: schemas.idParam
 			}
 		],
 		responses: {
@@ -204,6 +172,15 @@ users.patch(
 		summary: 'Updates a user by ID',
 		description: 'Updates the user based on the provided User ID.',
 		security: [{ BearerAuth: [] }],
+		parameters: [
+			{
+				name: 'id',
+				in: 'path',
+				description: 'User ID',
+				required: true,
+				schema: schemas.idParam
+			}
+		],
 		requestBody: {
 			description: 'User object partial',
 			required: true,
@@ -243,6 +220,15 @@ users.delete(
 		summary: 'Deletes a user by ID',
 		description: 'Deletes the user based on the provided User ID.',
 		security: [{ BearerAuth: [] }],
+		parameters: [
+			{
+				name: 'id',
+				in: 'path',
+				description: 'User ID',
+				required: true,
+				schema: schemas.idParam
+			}
+		],
 		responses: {
 			204: {
 				description: 'User deleted successfully'
@@ -272,6 +258,7 @@ users.get(
 		parameters: [
 			{
 				name: 'username',
+				description: 'Username of the user to retrieve',
 				in: 'path',
 				required: true,
 				schema: schemas.usernameParam
@@ -308,6 +295,7 @@ users.patch(
 		parameters: [
 			{
 				name: 'username',
+				description: 'Username of the user to update',
 				in: 'path',
 				required: true,
 				schema: schemas.usernameParam
@@ -355,6 +343,7 @@ users.delete(
 		parameters: [
 			{
 				name: 'username',
+				description: 'Username of the user to delete',
 				in: 'path',
 				required: true,
 				schema: schemas.usernameParam

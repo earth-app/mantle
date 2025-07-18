@@ -1,3 +1,5 @@
+import { Context } from 'hono';
+
 export function toBase64(bytes: Uint8Array) {
 	return btoa(String.fromCharCode(...bytes));
 }
@@ -41,4 +43,48 @@ export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2
 		Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
 	const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 	return R * c;
+}
+
+export function paginatedParameters(c: Context): {
+	code?: 400;
+	message?: string;
+	page: number;
+	limit: number;
+	search: string;
+} {
+	const page = c.req.query('page') ? parseInt(c.req.query('page')!) : 1;
+	const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 25;
+	const search = c.req.query('search') || '';
+
+	if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
+		return {
+			code: 400,
+			message: 'Invalid pagination parameters',
+			page: 1,
+			limit: 25,
+			search: ''
+		};
+	}
+
+	if (limit > 100) {
+		return {
+			code: 400,
+			message: 'Limit cannot exceed 100',
+			page: 1,
+			limit: 25,
+			search: ''
+		};
+	}
+
+	if (search.length > 40) {
+		return {
+			code: 400,
+			message: 'Search query cannot exceed 40 characters',
+			page: 1,
+			limit: 25,
+			search: ''
+		};
+	}
+
+	return { page, limit, search };
 }

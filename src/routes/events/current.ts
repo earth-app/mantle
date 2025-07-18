@@ -9,6 +9,7 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { bearerAuthMiddleware, getOwnerOfBearer } from '../../util/authentication';
 import { getEventById, getEventsByAttendees, updateEvent } from '../../util/routes/events';
+import { paginatedParameters } from '../../util/util';
 
 const currentEvent = new Hono<{ Bindings: Bindings }>();
 
@@ -38,6 +39,13 @@ currentEvent.get(
 	}),
 	bearerAuthMiddleware(),
 	async (c) => {
+		const params = paginatedParameters(c);
+		if (params.code && params.message) {
+			return c.json({ code: params.code, message: params.message }, params.code);
+		}
+
+		const { page, limit, search } = params;
+
 		const user = await getOwnerOfBearer(c);
 		if (!user) {
 			return c.json(
@@ -46,40 +54,6 @@ currentEvent.get(
 					message: 'Unauthorized'
 				},
 				401
-			);
-		}
-
-		const page = c.req.query('page') ? parseInt(c.req.query('page')!) : 1;
-		const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 25;
-		const search = c.req.query('search') || '';
-
-		if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid pagination parameters'
-				},
-				400
-			);
-		}
-
-		if (limit > 100) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Limit cannot exceed 100'
-				},
-				400
-			);
-		}
-
-		if (search.length > 40) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Search query cannot exceed 40 characters'
-				},
-				400
 			);
 		}
 

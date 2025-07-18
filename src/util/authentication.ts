@@ -168,6 +168,7 @@ export async function getTokenCount(owner: string, d1: D1Database) {
 
 export async function getOwnerOfToken(token: string, bindings: Bindings) {
 	if (!token) throw new Error('Token is required');
+	if (token == bindings.ADMIN_API_KEY) return null; // Admin API key does not have an owner
 
 	const d1 = bindings.DB;
 	await checkTableExists(d1);

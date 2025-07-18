@@ -25,9 +25,7 @@ activity.get(
 				in: 'path',
 				description: 'ID of the activity to retrieve',
 				required: true,
-				schema: {
-					type: 'string'
-				}
+				schema: schemas.idParam
 			}
 		],
 		responses: {
@@ -96,9 +94,7 @@ activity.patch(
 				in: 'path',
 				description: 'ID of the activity to update',
 				required: true,
-				schema: {
-					type: 'string'
-				}
+				schema: schemas.idParam
 			}
 		],
 		requestBody: {
@@ -193,9 +189,7 @@ activity.delete(
 				in: 'path',
 				description: 'ID of the activity to delete',
 				required: true,
-				schema: {
-					type: 'string'
-				}
+				schema: schemas.idParam
 			}
 		],
 		responses: {

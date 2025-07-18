@@ -13,6 +13,7 @@ import createActivity from './create';
 import Bindings from '../../bindings';
 import { adminMiddleware } from '../../util/authentication';
 import { getActivities } from '../../util/routes/activities';
+import { paginatedParameters } from '../../util/util';
 
 const activities = new Hono<{ Bindings: Bindings }>();
 
@@ -36,39 +37,12 @@ activities.get(
 		tags: [tags.ACTIVITIES]
 	}),
 	async (c) => {
-		const page = c.req.query('page') ? parseInt(c.req.query('page')!) : 1;
-		const limit = c.req.query('limit') ? parseInt(c.req.query('limit')!) : 25;
-		const search = c.req.query('search') || '';
-
-		if (isNaN(page) || isNaN(limit) || page < 1 || limit < 1) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid pagination parameters'
-				},
-				400
-			);
+		const params = paginatedParameters(c);
+		if (params.code && params.message) {
+			return c.json({ code: params.code, message: params.message }, params.code);
 		}
 
-		if (limit > 100) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Limit cannot exceed 100'
-				},
-				400
-			);
-		}
-
-		if (search.length > 40) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Search query cannot exceed 40 characters'
-				},
-				400
-			);
-		}
+		const { page, limit, search } = params;
 
 		const activites = await getActivities(c.env.DB, limit, page - 1, search);
 		return c.json(
