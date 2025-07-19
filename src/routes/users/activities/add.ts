@@ -42,7 +42,8 @@ addUserActivity.put(
 			403: schemas.forbidden,
 			404: {
 				description: 'User or Activity not found'
-			}
+			},
+			409: schemas.duplicate
 		},
 		tags: [tags.USERS]
 	}),
@@ -81,8 +82,18 @@ addUserActivity.put(
 			);
 		}
 
+		const user = res.data;
+		if (user.account.activities.asJsArrayView().some((a) => a.id === activityId)) {
+			return c.json(
+				{
+					code: 409,
+					message: `Activity with ID ${activityId} is already associated with user ${user.public.username}`
+				},
+				409
+			);
+		}
+
 		try {
-			const user = res.data;
 			user.account.addActivity(activity.activity);
 
 			await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);

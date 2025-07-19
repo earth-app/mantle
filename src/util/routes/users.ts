@@ -12,7 +12,7 @@ import { Context } from 'hono';
 
 // Helpers
 
-export async function createUser(username: string, callback: (user: com.earthapp.account.Account) => void) {
+export function createUser(username: string, callback: (user: com.earthapp.account.Account) => void) {
 	try {
 		const id = com.earthapp.account.Account.newId();
 		const user = new com.earthapp.account.Account(id, username);

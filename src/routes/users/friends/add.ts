@@ -41,7 +41,8 @@ addUserFriend.put(
 			403: schemas.forbidden,
 			404: {
 				description: 'User not found'
-			}
+			},
+			409: schemas.duplicate
 		},
 		tags: [tags.USERS]
 	}),
@@ -78,6 +79,16 @@ addUserFriend.put(
 					message: 'Friend not found'
 				},
 				404
+			);
+		}
+
+		if (user.account.getFriendIds().asJsReadonlySetView().has(friend.account.id)) {
+			return c.json(
+				{
+					code: 409,
+					message: `User ${friend.public.username} is already a friend`
+				},
+				409
 			);
 		}
 

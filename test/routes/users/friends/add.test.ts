@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBearerAuthHeader, MOCK_ADMIN_TOKEN, MOCK_USER_TOKEN } from '../../../helpers';
+import { setupAllTables } from '../../../table-setup';
 
 describe('User Friends Add Route', () => {
-	beforeEach(() => {
+	beforeEach(async () => {
 		vi.clearAllMocks();
+		await setupAllTables((globalThis as any).mockBindings.DB);
 	});
 
 	describe('Route structure', () => {
@@ -14,30 +16,34 @@ describe('User Friends Add Route', () => {
 			expect(typeof addFriendRoute.default.request).toBe('function');
 		});
 
-		it('should handle POST requests to add friend', async () => {
+		it('should handle PUT requests to add friend', async () => {
 			const addFriendRoute = await import('../../../../src/routes/users/friends/add');
-
-			const req = new Request('http://localhost/users/test-user/friends', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: createBearerAuthHeader(MOCK_USER_TOKEN)
-				},
-				body: JSON.stringify({
-					friendId: 'friend-user-id'
-				})
-			});
+			const { createUser, saveUser } = await import('../../../../src/util/routes/users');
 
 			try {
+				// Create and save test users
+				const testFriend = createUser('test-admin-friend', (user) => {
+					user.email = 'admin.test.friend@example.com';
+				});
+
+				await saveUser(testFriend, 'password', (globalThis as any).mockBindings.DB);
+				const req = new Request('http://localhost/users/test-user/friends?friendId=friend-user-id', {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: createBearerAuthHeader(MOCK_USER_TOKEN)
+					}
+				});
+
 				const res = await addFriendRoute.default.request(req, (globalThis as any).mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
 
 				// If successful, expect friend added
-				if (res.status === 201) {
+				if (res.status === 200) {
 					const responseData = (await res.json()) as any;
 					expect(responseData).toBeDefined();
-					expect(responseData.friendId).toBe('friend-user-id');
+					expect(responseData.username).toBe('test-user');
 				}
 			} catch (error) {
 				// Expected to fail in test environment
@@ -48,14 +54,11 @@ describe('User Friends Add Route', () => {
 		it('should require authentication for adding friends', async () => {
 			const addFriendRoute = await import('../../../../src/routes/users/friends/add');
 
-			const req = new Request('http://localhost/users/test-user/friends', {
-				method: 'POST',
+			const req = new Request('http://localhost/users/test-user/friends?friendId=friend-user-id', {
+				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					friendId: 'friend-user-id'
-				})
+				}
 			});
 
 			try {
@@ -67,18 +70,15 @@ describe('User Friends Add Route', () => {
 			}
 		});
 
-		it('should validate request body for adding friends', async () => {
+		it('should validate friend ID parameter for adding friends', async () => {
 			const addFriendRoute = await import('../../../../src/routes/users/friends/add');
 
 			const req = new Request('http://localhost/users/test-user/friends', {
-				method: 'POST',
+				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
 					Authorization: createBearerAuthHeader(MOCK_USER_TOKEN)
-				},
-				body: JSON.stringify({
-					// Missing required friendId
-				})
+				}
 			});
 
 			try {
@@ -93,7 +93,7 @@ describe('User Friends Add Route', () => {
 		it('should handle invalid HTTP methods', async () => {
 			const addFriendRoute = await import('../../../../src/routes/users/friends/add');
 
-			const req = new Request('http://localhost/users/test-user/friends', {
+			const req = new Request('http://localhost/users/test-user/friends?friendId=friend-user-id', {
 				method: 'GET'
 			});
 
@@ -108,28 +108,37 @@ describe('User Friends Add Route', () => {
 
 		it('should handle admin user requests', async () => {
 			const addFriendRoute = await import('../../../../src/routes/users/friends/add');
-
-			const req = new Request('http://localhost/users/test-user/friends', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: createBearerAuthHeader(MOCK_ADMIN_TOKEN)
-				},
-				body: JSON.stringify({
-					friendId: 'friend-user-id'
-				})
-			});
+			const { createUser, saveUser } = await import('../../../../src/util/routes/users');
 
 			try {
+				// Create and save test users
+				const testUser = createUser('test-admin-user', (user) => {
+					user.email = 'admin@example.com';
+				});
+				await saveUser(testUser, 'admin-password', (globalThis as any).mockBindings);
+
+				const friendUser = createUser('admin-friend-user', (user) => {
+					user.email = 'adminfriend@example.com';
+				});
+				await saveUser(friendUser, 'friend-password', (globalThis as any).mockBindings);
+
+				const req = new Request('http://localhost/users/test-admin-user/friends?friendId=admin-friend-user-id', {
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: createBearerAuthHeader(MOCK_ADMIN_TOKEN)
+					}
+				});
+
 				const res = await addFriendRoute.default.request(req, (globalThis as any).mockBindings);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
 
 				// Admin should be able to add friends
-				if (res.status === 201) {
+				if (res.status === 200) {
 					const responseData = (await res.json()) as any;
 					expect(responseData).toBeDefined();
-					expect(responseData.friendId).toBe('friend-user-id');
+					expect(responseData.username).toBe('test-admin-user');
 				}
 			} catch (error) {
 				// Expected to fail in test environment
@@ -137,11 +146,11 @@ describe('User Friends Add Route', () => {
 			}
 		});
 
-		it('should handle malformed JSON', async () => {
+		it('should handle missing friend ID parameter', async () => {
 			const addFriendRoute = await import('../../../../src/routes/users/friends/add');
 
 			const req = new Request('http://localhost/users/test-user/friends', {
-				method: 'POST',
+				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
 					Authorization: createBearerAuthHeader(MOCK_USER_TOKEN)

@@ -46,7 +46,7 @@ describe('User Activities Routes', () => {
 		it('should handle POST requests to add activity', async () => {
 			const addActivityRoute = await import('../../../../src/routes/users/activities/add');
 
-			const req = new Request('http://localhost/users/test-id/activities/add', {
+			const req = new Request('http://localhost/users/test-id/activities/add?activityId=test-activity-id', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -59,6 +59,7 @@ describe('User Activities Routes', () => {
 
 			try {
 				const res = await addActivityRoute.default.request(req);
+				console.log(res);
 				expect(res).toBeDefined();
 				expect(res.status).toBeDefined();
 			} catch (error) {

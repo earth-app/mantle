@@ -389,3 +389,12 @@ export const forbidden = {
 		}
 	}
 };
+
+export const duplicate = {
+	description: 'Duplicate entry',
+	content: {
+		'application/json': {
+			schema: resolver(error(409, 'Duplicate entry'))
+		}
+	}
+};
