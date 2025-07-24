@@ -92,6 +92,12 @@ export const idParam = {
 	example: 'eyb2cCNwc73b197cnsHbDqiU'
 } satisfies OpenAPIV3.ParameterObject['schema'];
 
+export const idNumberParam = {
+	type: 'integer',
+	minimum: 1,
+	example: 123
+} satisfies OpenAPIV3.ParameterObject['schema'];
+
 // Enum Types
 export const activityType = z
 	.enum(com.earthapp.activity.ActivityType.values().map((v) => v.name) as [string, ...string[]])
@@ -230,6 +236,28 @@ export const eventUpdate = z
 		}
 	});
 
+export const promptCreate = z
+	.object({
+		prompt: text,
+		visibility: userPrivacy.optional().default('PUBLIC')
+	})
+	.openapi({
+		example: {
+			prompt: 'What is the meaning of life?',
+			visibility: 'PUBLIC'
+		}
+	});
+
+export const promptResponseBody = z
+	.object({
+		content: text.max(700)
+	})
+	.openapi({
+		example: {
+			content: 'The meaning of life is 42.'
+		}
+	});
+
 /// Return Objects
 
 export const user = z
@@ -293,6 +321,7 @@ export const user = z
 		}
 	});
 export const users = z.array(user);
+
 export const loginResponse = z.custom<LoginUser>().openapi({
 	example: {
 		id: 'eb9137b1272938',
@@ -361,7 +390,45 @@ export const activity = z
 	});
 export const activities = z.array(activity);
 
-// Reponse Schemas
+export const prompt = z
+	.object({
+		id: z.number().positive().openapi({ example: 123 }),
+		prompt: text,
+		visibility: userPrivacy,
+		created_at: date,
+		updated_at: date.optional()
+	})
+	.openapi({
+		example: {
+			id: 123,
+			prompt: 'What is the meaning of life?',
+			visibility: 'PUBLIC',
+			created_at: '2025-05-11T10:00:00Z',
+			updated_at: '2025-05-11T12:00:00Z'
+		}
+	});
+export const prompts = z.array(prompt);
+
+export const promptResponse = z
+	.object({
+		id: z.number().int().positive().openapi({ example: 456 }),
+		prompt_id: z.number().positive().openapi({ example: 123 }),
+		response: text,
+		created_at: date,
+		updated_at: date.optional()
+	})
+	.openapi({
+		example: {
+			id: 456,
+			prompt_id: 123,
+			response: 'The meaning of life is 42.',
+			created_at: '2025-05-11T10:00:00Z',
+			updated_at: '2025-05-11T12:00:00Z'
+		}
+	});
+export const promptResponses = z.array(promptResponse);
+
+// Response Schemas
 
 export const badRequest = {
 	description: 'Bad request',
