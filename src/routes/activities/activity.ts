@@ -21,7 +21,7 @@ activity.get(
 		description: 'Gets details of a specific activity in the Earth App.',
 		parameters: [
 			{
-				name: 'activity_id',
+				name: 'activityId',
 				in: 'path',
 				description: 'ID of the activity to retrieve',
 				required: true,
@@ -45,7 +45,7 @@ activity.get(
 		tags: [tags.ACTIVITIES]
 	}),
 	async (c) => {
-		const id = c.req.param('activity_id');
+		const id = c.req.param('activityId');
 		if (!id) {
 			return c.json(
 				{
@@ -90,7 +90,7 @@ activity.patch(
 		security: [{ BearerAuth: [] }],
 		parameters: [
 			{
-				name: 'activity_id',
+				name: 'activityId',
 				in: 'path',
 				description: 'ID of the activity to update',
 				required: true,
@@ -128,7 +128,7 @@ activity.patch(
 	}),
 	adminMiddleware(),
 	async (c) => {
-		const id = c.req.param('activity_id');
+		const id = c.req.param('activityId');
 		if (!id) {
 			return c.json(
 				{
@@ -185,7 +185,7 @@ activity.delete(
 		security: [{ BearerAuth: [] }],
 		parameters: [
 			{
-				name: 'activity_id',
+				name: 'activityId',
 				in: 'path',
 				description: 'ID of the activity to delete',
 				required: true,
@@ -206,7 +206,7 @@ activity.delete(
 	}),
 	adminMiddleware(),
 	async (c) => {
-		const id = c.req.param('activity_id');
+		const id = c.req.param('activityId');
 		if (!id) {
 			return c.json(
 				{

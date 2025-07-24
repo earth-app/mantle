@@ -8,7 +8,7 @@ describe('Rate Limit Utility', () => {
 	describe('Rate limit function export', () => {
 		it('should export rateLimit function', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 				expect(typeof rateLimit).toBe('function');
 			} catch (error: any) {
 				// Skip test if cloudflare:workers module is not available in test environment
@@ -22,7 +22,7 @@ describe('Rate Limit Utility', () => {
 
 		it('should create middleware for anonymous users', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 				const middleware = rateLimit();
 				expect(typeof middleware).toBe('function');
 			} catch (error: any) {
@@ -37,7 +37,7 @@ describe('Rate Limit Utility', () => {
 
 		it('should create middleware for authenticated users', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 				const middleware = rateLimit(true);
 				expect(typeof middleware).toBe('function');
 			} catch (error: any) {
@@ -54,7 +54,7 @@ describe('Rate Limit Utility', () => {
 	describe('Rate limit configuration', () => {
 		it('should handle different authentication states', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 
 				const anonymousMiddleware = rateLimit(false);
 				const authMiddleware = rateLimit(true);
@@ -73,7 +73,7 @@ describe('Rate Limit Utility', () => {
 
 		it('should handle default parameters', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 
 				const defaultMiddleware = rateLimit();
 				expect(typeof defaultMiddleware).toBe('function');
@@ -91,7 +91,7 @@ describe('Rate Limit Utility', () => {
 	describe('Middleware functionality', () => {
 		it('should call cloudflareRateLimiter with correct config', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 
 				const middleware = rateLimit(true);
 				expect(typeof middleware).toBe('function');
@@ -107,7 +107,7 @@ describe('Rate Limit Utility', () => {
 
 		it('should return a middleware function', async () => {
 			try {
-				const { rateLimit } = await import('../../src/util/ratelimit');
+				const { globalRateLimit: rateLimit } = await import('../../src/util/ratelimit');
 
 				const middleware = rateLimit(false);
 				expect(typeof middleware).toBe('function');

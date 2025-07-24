@@ -60,6 +60,6 @@ activities.get(
 activities.use('/create', adminMiddleware());
 activities.route('/create', createActivity);
 
-activities.route('/:activity_id', activity);
+activities.route('/:activityId', activity);
 
 export default activities;

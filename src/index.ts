@@ -8,7 +8,7 @@ import { logger } from 'hono/logger';
 import { secureHeaders } from 'hono/secure-headers';
 
 import routes from './routes';
-import { rateLimit } from './util/ratelimit';
+import { globalRateLimit } from './util/ratelimit';
 
 import * as packageJson from '../package.json';
 import Bindings from './bindings';
@@ -42,7 +42,7 @@ app.get(
 		vary: ['Accept-Encoding', 'Authorization']
 	})
 );
-app.use('/v1/*', rateLimit());
+app.use('/v1/*', globalRateLimit());
 
 // Declare routes
 app.route('/v1', routes);

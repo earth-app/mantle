@@ -3,7 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockContext, MOCK_ADMIN_TOKEN, MOCK_USER_TOKEN } from '../helpers';
 
 // Import using dynamic import to avoid vi.mock issues
-const { checkKVRateLimit, kvRateLimit, kvUserRateLimit, rateLimitConfigs } = await import('../../src/util/kv-ratelimit');
+const {
+	checkKVRateLimit,
+	ipRateLimit: kvRateLimit,
+	authRateLimit: kvUserRateLimit,
+	rateLimitConfigs
+} = await import('../../src/util/kv-ratelimit');
 
 describe('KV Rate Limiting', () => {
 	let mockKV: KVNamespace;
@@ -269,7 +274,7 @@ describe('KV Rate Limiting', () => {
 	describe('Rate limit configurations', () => {
 		it('should have correct user creation config', () => {
 			expect(rateLimitConfigs.userCreate).toEqual({
-				requests: 3,
+				requests: 1,
 				windowMs: 5 * 60 * 1000,
 				keyPrefix: 'rl:user:create'
 			});
@@ -277,7 +282,7 @@ describe('KV Rate Limiting', () => {
 
 		it('should have correct user login config', () => {
 			expect(rateLimitConfigs.userLogin).toEqual({
-				requests: 5,
+				requests: 3,
 				windowMs: 60 * 1000,
 				keyPrefix: 'rl:user:login'
 			});
@@ -293,7 +298,7 @@ describe('KV Rate Limiting', () => {
 
 		it('should have correct event creation config', () => {
 			expect(rateLimitConfigs.eventCreate).toEqual({
-				requests: 1,
+				requests: 3,
 				windowMs: 2 * 60 * 1000,
 				keyPrefix: 'rl:event:create'
 			});
@@ -301,9 +306,41 @@ describe('KV Rate Limiting', () => {
 
 		it('should have correct event update config', () => {
 			expect(rateLimitConfigs.eventUpdate).toEqual({
-				requests: 1,
+				requests: 5,
 				windowMs: 2 * 60 * 1000,
 				keyPrefix: 'rl:event:update'
+			});
+		});
+
+		it('should have correct prompt creation config', () => {
+			expect(rateLimitConfigs.promptCreate).toEqual({
+				requests: 7,
+				windowMs: 2 * 60 * 1000,
+				keyPrefix: 'rl:prompt:create'
+			});
+		});
+
+		it('should have correct prompt update config', () => {
+			expect(rateLimitConfigs.promptUpdate).toEqual({
+				requests: 15,
+				windowMs: 2 * 60 * 1000,
+				keyPrefix: 'rl:prompt:update'
+			});
+		});
+
+		it('should have correct prompt response config', () => {
+			expect(rateLimitConfigs.promptResponseCreate).toEqual({
+				requests: 2,
+				windowMs: 30 * 1000,
+				keyPrefix: 'rl:prompt:response'
+			});
+		});
+
+		it('should have correct user delete config', () => {
+			expect(rateLimitConfigs.promptResponseUpdate).toEqual({
+				requests: 1,
+				windowMs: 60 * 1000,
+				keyPrefix: 'rl:prompt:response:update'
 			});
 		});
 	});

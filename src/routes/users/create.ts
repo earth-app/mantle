@@ -8,8 +8,8 @@ import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
 import Bindings from '../../bindings';
-import { kvRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
-import { rateLimit } from '../../util/ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { globalRateLimit } from '../../util/ratelimit';
 import * as users from '../../util/routes/users';
 
 const createUser = new Hono<{ Bindings: Bindings }>();
@@ -17,8 +17,8 @@ const createUser = new Hono<{ Bindings: Bindings }>();
 createUser.post(
 	'/',
 	// Apply both KV rate limiting and existing Cloudflare rate limiting
-	kvRateLimit(rateLimitConfigs.userCreate),
-	rateLimit(false), // Anonymous rate limiting
+	ipRateLimit(rateLimitConfigs.userCreate),
+	globalRateLimit(false), // Anonymous rate limiting
 	describeRoute({
 		summary: 'Create a new user',
 		description: 'Creates a new user within the Earth App',

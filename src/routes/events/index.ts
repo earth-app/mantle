@@ -12,7 +12,6 @@ import event from './event';
 
 // Implementation
 import Bindings from '../../bindings';
-import { bearerAuthMiddleware } from '../../util/authentication';
 import { getEvents } from '../../util/routes/events';
 import { paginatedParameters } from '../../util/util';
 
@@ -45,7 +44,7 @@ events.get(
 
 		const { page, limit, search } = params;
 
-		const events = await getEvents(c.env.DB, limit, page - 1);
+		const events = await getEvents(c.env.DB, limit, page - 1, search);
 		return c.json(
 			{
 				page: page,
@@ -58,12 +57,8 @@ events.get(
 	}
 );
 
-events.use('/create', bearerAuthMiddleware());
 events.route('/create', createEvent);
-
 events.route('/:eventId', event);
-
-events.use('/current', bearerAuthMiddleware());
 events.route('/current', currentEvent);
 
 export default events;

@@ -1,4 +1,5 @@
 import type { KVNamespace } from '@cloudflare/workers-types';
+import { com } from '@earth-app/ocean';
 import type { Context } from 'hono';
 import Bindings from '../bindings';
 import { getOwnerOfBearer } from './authentication';
@@ -24,7 +25,7 @@ async function isUserAdmin(c: Context<{ Bindings: Bindings }>): Promise<boolean>
 	if (!bearerToken || !bearerToken.startsWith('Bearer ')) return false;
 
 	const token = bearerToken.slice(7);
-	if (token.length !== 64) return false; // com.earthapp.util.API_KEY_LENGTH
+	if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
 
 	if (token === c.env.ADMIN_API_KEY) return true;
 
@@ -89,13 +90,11 @@ export async function checkKVRateLimit(kv: KVNamespace, config: RateLimitConfig,
 /**
  * Create KV rate limit middleware
  */
-export function kvRateLimit(config: RateLimitConfig) {
+export function ipRateLimit(config: RateLimitConfig) {
 	return async (c: Context<{ Bindings: Bindings }>, next: () => Promise<void>) => {
 		// Skip rate limiting for administrators
 		const isAdmin = await isUserAdmin(c);
-		if (isAdmin) {
-			return next();
-		}
+		if (isAdmin) return next();
 
 		// Use IP address as identifier, fallback to 'anonymous'
 		const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() || 'anonymous';
@@ -125,13 +124,11 @@ export function kvRateLimit(config: RateLimitConfig) {
 /**
  * Create user-specific KV rate limit middleware (requires authentication)
  */
-export function kvUserRateLimit(config: RateLimitConfig) {
+export function authRateLimit(config: RateLimitConfig) {
 	return async (c: Context<{ Bindings: Bindings }>, next: () => Promise<void>) => {
 		// Skip rate limiting for administrators
 		const isAdmin = await isUserAdmin(c);
-		if (isAdmin) {
-			return next();
-		}
+		if (isAdmin) return next();
 
 		// Get user identifier from bearer token
 		const owner = await getOwnerOfBearer(c);
@@ -166,34 +163,58 @@ export function kvUserRateLimit(config: RateLimitConfig) {
  * Predefined rate limit configurations
  */
 export const rateLimitConfigs = {
-	// 1. POST /v1/users/create - 3 times every 5 minutes
+	// 1 every 5 minutes per user
 	userCreate: {
-		requests: 3,
+		requests: 1,
 		windowMs: 5 * 60 * 1000, // 5 minutes
 		keyPrefix: 'rl:user:create'
 	},
-	// 2. POST /v1/users/login - 5 times every minute
+	// 3 every 1 minute per user
 	userLogin: {
-		requests: 5,
+		requests: 3,
 		windowMs: 60 * 1000, // 1 minute
 		keyPrefix: 'rl:user:login'
 	},
-	// 3. PATCH /v1/users/current - 10 times every minute
+	// 10 every 1 minute per user
 	userUpdate: {
 		requests: 10,
 		windowMs: 60 * 1000, // 1 minute
 		keyPrefix: 'rl:user:update'
 	},
-	// 4. Event creation - every 2 minutes per user
+	// 3 every 2 minutes per user
 	eventCreate: {
-		requests: 1,
+		requests: 3,
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:event:create'
 	},
-	// 5. Event update - every 2 minutes per user
+	// 5 every 2 minutes per user
 	eventUpdate: {
-		requests: 1,
+		requests: 5,
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:event:update'
+	},
+	// 7 every 2 minutes per user
+	promptCreate: {
+		requests: 7,
+		windowMs: 2 * 60 * 1000, // 2 minutes
+		keyPrefix: 'rl:prompt:create'
+	},
+	// 15 every 2 minutes per user
+	promptUpdate: {
+		requests: 15,
+		windowMs: 2 * 60 * 1000, // 2 minutes
+		keyPrefix: 'rl:prompt:update'
+	},
+	// 2 every 30 seconds per user
+	promptResponseCreate: {
+		requests: 2,
+		windowMs: 30 * 1000, // 30 seconds
+		keyPrefix: 'rl:prompt:response'
+	},
+	// 1 every minute per user
+	promptResponseUpdate: {
+		requests: 1,
+		windowMs: 60 * 1000, // 1 minute
+		keyPrefix: 'rl:prompt:response:update'
 	}
 } as const;

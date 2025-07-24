@@ -4,6 +4,7 @@ import { basicAuth } from 'hono/basic-auth';
 import { bearerAuth } from 'hono/bearer-auth';
 
 import { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import { ContentfulStatusCode } from 'hono/utils/http-status';
 import Bindings from '../bindings';
 import * as encryption from './encryption';
@@ -349,6 +350,19 @@ export async function getOwnerOfBearer(c: Context<{ Bindings: Bindings }>) {
 
 // Middleware
 
+export function basicAuthMiddleware() {
+	return basicAuth({
+		verifyUser: async (username: string, password: string, c: Context) => {
+			const dbuser = await getUserByUsername(username, c.env);
+			if (!dbuser) return false;
+
+			const user = dbuser.database;
+			const salt = util.fromBase64(user.salt);
+			return await encryption.comparePassword(password, salt, util.fromBase64(user.password));
+		}
+	});
+}
+
 export function bearerAuthMiddleware() {
 	return bearerAuth({
 		verifyToken: async (token: string, c: Context) => {
@@ -361,26 +375,33 @@ export function bearerAuthMiddleware() {
 	});
 }
 
+export function typeMiddleware(accountType: com.earthapp.account.AccountType, soft: boolean = true) {
+	return bearerAuth({
+		verifyToken: async (token: string, c: Context<{ Bindings: Bindings }>) => {
+			if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
+
+			const owner = await getOwnerOfToken(token, c.env);
+			if (!owner) return false;
+
+			if (token === c.env.ADMIN_API_KEY || owner.account.isAdmin) return true;
+
+			const allowed = soft ? owner.account.type.ordinal >= accountType.ordinal : owner.account.type === accountType;
+			if (allowed) return true;
+
+			throw new HTTPException(403, { message: `Forbidden: This action requires ${accountType.name} account type.` });
+		}
+	});
+}
+
 export function adminMiddleware() {
 	return bearerAuth({
 		verifyToken: async (token: string, c: Context<{ Bindings: Bindings }>) => {
 			if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
 
 			const owner = await getOwnerOfToken(token, c.env);
-			return token === c.env.ADMIN_API_KEY || owner?.account.isAdmin || false;
-		}
-	});
-}
+			if (token === c.env.ADMIN_API_KEY || owner?.account.isAdmin) return true;
 
-export function basicAuthMiddleware() {
-	return basicAuth({
-		verifyUser: async (username: string, password: string, c: Context) => {
-			const dbuser = await getUserByUsername(username, c.env);
-			if (!dbuser) return false;
-
-			const user = dbuser.database;
-			const salt = util.fromBase64(user.salt);
-			return await encryption.comparePassword(password, salt, util.fromBase64(user.password));
+			throw new HTTPException(403, { message: 'Forbidden: This action requires elevated privileges.' });
 		}
 	});
 }

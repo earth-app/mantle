@@ -11,7 +11,8 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { Event } from '../../types/events';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
-import { kvUserRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { globalRateLimit } from '../../util/ratelimit';
 import { deleteEvent, getEventById, patchEvent } from '../../util/routes/events';
 
 const event = new Hono<{ Bindings: Bindings }>();
@@ -99,7 +100,8 @@ event.get(
 // Update Event
 event.patch(
 	'/',
-	kvUserRateLimit(rateLimitConfigs.eventUpdate),
+	authRateLimit(rateLimitConfigs.eventUpdate),
+	globalRateLimit(true), // Authenticated rate limiting
 	describeRoute({
 		summary: 'Update an event',
 		description: 'Updates an existing event by its ID.',
@@ -228,6 +230,7 @@ event.patch(
 // Delete Event
 event.delete(
 	'/',
+	globalRateLimit(true), // Authenticated rate limiting
 	describeRoute({
 		summary: 'Delete an event',
 		description: 'Deletes an existing event by its ID.',

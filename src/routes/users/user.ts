@@ -16,8 +16,8 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { User, UserObject } from '../../types/users';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer } from '../../util/authentication';
-import { kvUserRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
-import { rateLimit } from '../../util/ratelimit';
+import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { globalRateLimit } from '../../util/ratelimit';
 import { deleteUser, getUserById, getUserByUsername, getUserFromContext, patchUser } from '../../util/routes/users';
 
 const user = new Hono<{ Bindings: Bindings }>();
@@ -77,8 +77,8 @@ user.get('/', async (c) => {
 // Patch User
 user.patch(
 	'/',
-	kvUserRateLimit(rateLimitConfigs.userUpdate),
-	rateLimit(true), // Authenticated rate limiting
+	authRateLimit(rateLimitConfigs.userUpdate),
+	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
 	async (c) => {
 		const rawBody = await c.req.text();
@@ -197,6 +197,8 @@ user.patch(
 		},
 		tags: [tags.USERS]
 	}),
+	authRateLimit(rateLimitConfigs.userUpdate),
+	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
 	async (c) => {
 		const rawBody = await c.req.text();
