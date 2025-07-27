@@ -9,7 +9,6 @@ import * as tags from '../../openapi/tags';
 
 // Implementation
 import { com } from '@earth-app/ocean';
-import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
@@ -82,32 +81,19 @@ createPrompt.post(
 			);
 		}
 
-		try {
-			let newPrompt = prompts.createPrompt(prompt, visibility, owner.account.id);
-			if (!newPrompt) {
-				return c.json(
-					{
-						code: 500,
-						message: 'Failed to create prompt.'
-					},
-					500
-				);
-			}
-
-			newPrompt = await prompts.savePrompt(newPrompt, c.env.DB);
-			return c.json(newPrompt, 201);
-		} catch (error) {
-			if (error instanceof HTTPException) throw error;
-			console.error('Failed to create prompt:', error);
-
+		let newPrompt = prompts.createPrompt(prompt, visibility, owner.account.id);
+		if (!newPrompt) {
 			return c.json(
 				{
 					code: 500,
-					message: `Failed to create prompt: ${error instanceof Error ? error.message : 'Unknown error'}`
+					message: 'Failed to create prompt.'
 				},
 				500
 			);
 		}
+
+		newPrompt = await prompts.savePrompt(newPrompt, c.env.DB);
+		return c.json(newPrompt, 201);
 	}
 );
 

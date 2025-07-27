@@ -93,20 +93,10 @@ addUserActivity.put(
 			);
 		}
 
-		try {
-			user.account.addActivity(activity.activity);
+		user.account.addActivity(activity.activity);
 
-			await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
-			return c.json(user.public, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 400,
-					message: `Failed to add activity: ${error instanceof Error ? error.message : 'Unknown error'}`
-				},
-				400
-			);
-		}
+		await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
+		return c.json(user.public, 200);
 	}
 );
 

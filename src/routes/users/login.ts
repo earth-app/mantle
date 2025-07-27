@@ -69,7 +69,7 @@ login.post(
 			);
 		}
 
-		return c.json(res);
+		return c.json(res, 200);
 	}
 );
 

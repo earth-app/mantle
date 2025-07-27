@@ -213,18 +213,8 @@ event.patch(
 			);
 		}
 
-		try {
-			const updatedEvent = await patchEvent(event.event, data, c.env.DB);
-			return c.json(updatedEvent.public, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: `Failed to update event: ${error instanceof Error ? error.message : 'Unknown error'}`
-				},
-				500
-			);
-		}
+		const updatedEvent = await patchEvent(event.event, data, c.env.DB);
+		return c.json(updatedEvent.public, 200);
 	}
 );
 // Delete Event
@@ -311,28 +301,18 @@ event.delete(
 			);
 		}
 
-		try {
-			const result = await deleteEvent(id, c.env.DB);
-			if (!result) {
-				return c.json(
-					{
-						code: 404,
-						message: 'Event not found'
-					},
-					404
-				);
-			}
-
-			return c.body(null, 204);
-		} catch (error) {
+		const result = await deleteEvent(id, c.env.DB);
+		if (!result) {
 			return c.json(
 				{
-					code: 500,
-					message: `Failed to delete event: ${error instanceof Error ? error.message : 'Unknown error'}`
+					code: 404,
+					message: 'Event not found'
 				},
-				500
+				404
 			);
 		}
+
+		return c.body(null, 204);
 	}
 );
 

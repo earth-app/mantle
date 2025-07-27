@@ -53,43 +53,33 @@ createActivity.post(
 			);
 		}
 
-		try {
-			if (await activities.doesActivityExist(id, c.env.DB)) {
-				return c.json(
-					{
-						code: 400,
-						message: `Activity with ID ${id} already exists`
-					},
-					400
-				);
-			}
+		if (await activities.doesActivityExist(id, c.env.DB)) {
+			return c.json(
+				{
+					code: 400,
+					message: `Activity with ID ${id} already exists`
+				},
+				400
+			);
+		}
 
-			const activity = activities.createActivity(id, name, (activity) => {
-				activity.description = description;
-				activity.types.asJsArrayView().push(...types);
-			});
+		const activity = activities.createActivity(id, name, (activity) => {
+			activity.description = description;
+			activity.types.asJsArrayView().push(...types);
+		});
 
-			const obj = await activities.saveActivity(activity, c.env.DB);
-			if (!obj) {
-				return c.json(
-					{
-						code: 500,
-						message: 'Failed to create activity'
-					},
-					500
-				);
-			}
-
-			return c.json(obj.public, 201);
-		} catch (error) {
+		const obj = await activities.saveActivity(activity, c.env.DB);
+		if (!obj) {
 			return c.json(
 				{
 					code: 500,
-					message: `Failed to create activity: ${error}`
+					message: 'Failed to create activity'
 				},
 				500
 			);
 		}
+
+		return c.json(obj.public, 201);
 	}
 );
 

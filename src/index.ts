@@ -10,10 +10,33 @@ import { secureHeaders } from 'hono/secure-headers';
 import routes from './routes';
 import { globalRateLimit } from './util/ratelimit';
 
+import { HTTPException } from 'hono/http-exception';
 import * as packageJson from '../package.json';
 import Bindings from './bindings';
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+// Error handling middleware
+app.onError((err, c) => {
+	if (err instanceof HTTPException) {
+		return c.json(
+			{
+				code: err.status,
+				message: err.message
+			},
+			err.status
+		);
+	}
+
+	console.error('Unhandled error:', err);
+	return c.json(
+		{
+			code: 500,
+			message: 'Internal Server Error'
+		},
+		500
+	);
+});
 
 app.use(secureHeaders()); // Secure headers middleware
 app.use(logger()); // Logger middleware

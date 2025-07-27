@@ -91,7 +91,6 @@ user.patch(
 		}
 
 		const user = res.data;
-
 		if (data.type || data.id) {
 			data = {
 				...data,
@@ -120,28 +119,18 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 	}
 	const user = res.data;
 
-	try {
-		const result = await users.deleteUser(user.account.id, c.env);
-		if (!result) {
-			return c.json(
-				{
-					code: 404,
-					message: 'User not found'
-				},
-				404
-			);
-		}
-
-		return c.body(null, 204);
-	} catch (error) {
+	const result = await users.deleteUser(user.account.id, c.env);
+	if (!result) {
 		return c.json(
 			{
-				code: 500,
-				message: `Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`
+				code: 404,
+				message: 'User not found'
 			},
-			500
+			404
 		);
 	}
+
+	return c.body(null, 204);
 });
 
 // Change Field Privacy
@@ -265,23 +254,13 @@ user.get(
 			);
 		}
 
-		try {
-			const user = res.data;
-			const profile = await users.getProfilePhoto(user.public, c.env);
+		const user = res.data;
+		const profile = await users.getProfilePhoto(user.public, c.env);
 
-			c.res.headers.set('Content-Type', 'image/jpeg');
-			c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
+		c.res.headers.set('Content-Type', 'image/jpeg');
+		c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
 
-			return c.body(profile, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: `Failed to get profile photo: ${error instanceof Error ? error.message : 'Unknown error'}`
-				},
-				500
-			);
-		}
+		return c.body(profile, 200);
 	}
 );
 
@@ -319,23 +298,13 @@ user.put(
 			);
 		}
 
-		try {
-			const user = res.data;
-			const profile = await users.newProfilePhoto(user.public, c.env);
+		const user = res.data;
+		const profile = await users.newProfilePhoto(user.public, c.env);
 
-			c.res.headers.set('Content-Type', 'image/jpeg');
-			c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
+		c.res.headers.set('Content-Type', 'image/jpeg');
+		c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
 
-			return c.body(profile, 201);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: `Failed to regenerate profile photo: ${error instanceof Error ? error.message : 'Unknown error'}`
-				},
-				500
-			);
-		}
+		return c.body(profile, 201);
 	}
 );
 

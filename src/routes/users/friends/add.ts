@@ -92,20 +92,10 @@ addUserFriend.put(
 			);
 		}
 
-		try {
-			user.account.addFriend(friend.account);
-			await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
+		user.account.addFriend(friend.account);
+		await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
 
-			return c.json(user.public, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: 'Failed to add friend'
-				},
-				500
-			);
-		}
+		return c.json(user.public, 200);
 	}
 );
 

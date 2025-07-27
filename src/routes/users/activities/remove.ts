@@ -81,21 +81,11 @@ removeUserActivity.delete(
 			);
 		}
 
-		try {
-			const user = res.data;
-			user.account.removeActivityById(activityId);
+		const user = res.data;
+		user.account.removeActivityById(activityId);
 
-			await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
-			return c.json(user, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: `Failed to remove activity: ${error}`
-				},
-				500
-			);
-		}
+		await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
+		return c.json(user, 200);
 	}
 );
 

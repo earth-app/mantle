@@ -9,7 +9,6 @@ import * as tags from '../../openapi/tags';
 
 // Implementation
 import { com } from '@earth-app/ocean';
-import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
@@ -72,28 +71,18 @@ prompt.get(
 			);
 		}
 
-		try {
-			const prompt = await prompts.getPromptById(promptId, c.env.DB);
-			if (!prompt) {
-				return c.json(
-					{
-						code: 404,
-						message: `Prompt with ID ${promptId} not found`
-					},
-					404
-				);
-			}
-
-			return c.json(prompt, 200);
-		} catch (error) {
+		const prompt = await prompts.getPromptById(promptId, c.env.DB);
+		if (!prompt) {
 			return c.json(
 				{
-					code: 500,
-					message: 'Internal Server Error'
+					code: 404,
+					message: `Prompt with ID ${promptId} not found`
 				},
-				500
+				404
 			);
 		}
+
+		return c.json(prompt, 200);
 	}
 );
 
@@ -205,21 +194,8 @@ prompt.patch(
 			);
 		}
 
-		try {
-			const updatedPrompt = await prompts.updatePrompt(promptId, { ...existingPrompt, prompt, visibility }, c.env.DB);
-			return c.json(updatedPrompt, 200);
-		} catch (error) {
-			if (error instanceof HTTPException) throw error;
-			console.error('Failed to update prompt:', error);
-
-			return c.json(
-				{
-					code: 500,
-					message: 'Internal Server Error'
-				},
-				500
-			);
-		}
+		const updatedPrompt = await prompts.updatePrompt(promptId, { ...existingPrompt, prompt, visibility }, c.env.DB);
+		return c.json(updatedPrompt, 200);
 	}
 );
 
@@ -307,21 +283,8 @@ prompt.delete(
 			);
 		}
 
-		try {
-			await prompts.deletePrompt(promptId, c.env.DB);
-			return c.body(null, 204);
-		} catch (error) {
-			if (error instanceof HTTPException) throw error;
-			console.error('Failed to delete prompt:', error);
-
-			return c.json(
-				{
-					code: 500,
-					message: 'Internal Server Error'
-				},
-				500
-			);
-		}
+		await prompts.deletePrompt(promptId, c.env.DB);
+		return c.body(null, 204);
 	}
 );
 
@@ -386,18 +349,8 @@ prompt.get(
 
 		const { page, limit, search } = params;
 
-		try {
-			const responses = await prompts.getPromptResponses(promptId, c.env, limit, page - 1, search);
-			return c.json(responses, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: 'Internal Server Error'
-				},
-				500
-			);
-		}
+		const responses = await prompts.getPromptResponses(promptId, c.env, limit, page - 1, search);
+		return c.json(responses, 200);
 	}
 );
 
@@ -509,23 +462,10 @@ prompt.post(
 			);
 		}
 
-		try {
-			const promptResponse = prompts.createPromptResponse(id, content, owner.account.id);
-			const response = await prompts.savePromptResponse(existingPrompt, promptResponse, c.env.DB);
+		const promptResponse = prompts.createPromptResponse(id, content, owner.account.id);
+		const response = await prompts.savePromptResponse(existingPrompt, promptResponse, c.env.DB);
 
-			return c.json(response, 201);
-		} catch (error) {
-			if (error instanceof HTTPException) throw error;
-			console.error('Failed to create prompt response:', error);
-
-			return c.json(
-				{
-					code: 500,
-					message: 'Internal Server Error'
-				},
-				500
-			);
-		}
+		return c.json(response, 201);
 	}
 );
 
@@ -763,27 +703,14 @@ prompt.patch(
 			);
 		}
 
-		try {
-			await prompts.updatePromptResponse(responseId, { ...existingResponse, response }, c.env.DB);
-			return c.json(
-				{
-					code: 200,
-					message: 'Prompt response updated successfully'
-				},
-				200
-			);
-		} catch (error) {
-			if (error instanceof HTTPException) throw error;
-			console.error('Failed to update prompt response:', error);
-
-			return c.json(
-				{
-					code: 500,
-					message: 'Internal Server Error'
-				},
-				500
-			);
-		}
+		await prompts.updatePromptResponse(responseId, { ...existingResponse, response }, c.env.DB);
+		return c.json(
+			{
+				code: 200,
+				message: 'Prompt response updated successfully'
+			},
+			200
+		);
 	}
 );
 
@@ -877,21 +804,8 @@ prompt.delete(
 			);
 		}
 
-		try {
-			await prompts.deletePromptResponse(responseId, c.env.DB);
-			return c.body(null, 204);
-		} catch (error) {
-			if (error instanceof HTTPException) throw error;
-			console.error('Failed to delete prompt response:', error);
-
-			return c.json(
-				{
-					code: 500,
-					message: 'Internal Server Error'
-				},
-				500
-			);
-		}
+		await prompts.deletePromptResponse(responseId, c.env.DB);
+		return c.body(null, 204);
 	}
 );
 

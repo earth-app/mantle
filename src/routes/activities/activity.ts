@@ -56,28 +56,18 @@ activity.get(
 			);
 		}
 
-		try {
-			const activity = await activities.getActivityById(id, c.env.DB);
-			if (!activity) {
-				return c.json(
-					{
-						code: 404,
-						message: `Activity with ID ${id} not found`
-					},
-					404
-				);
-			}
-
-			return c.json(activity);
-		} catch (error) {
+		const activity = await activities.getActivityById(id, c.env.DB);
+		if (!activity) {
 			return c.json(
 				{
-					code: 500,
-					message: `Failed to retrieve activity: ${error}`
+					code: 404,
+					message: `Activity with ID ${id} not found`
 				},
-				500
+				404
 			);
 		}
+
+		return c.json(activity);
 	}
 );
 
@@ -151,28 +141,18 @@ activity.patch(
 			);
 		}
 
-		try {
-			const updatedActivity = await activities.patchActivity(activity.activity, data, c.env.DB);
-			if (!updatedActivity) {
-				return c.json(
-					{
-						code: 404,
-						message: `Activity with ID ${id} not found`
-					},
-					404
-				);
-			}
-
-			return c.json(updatedActivity.public, 200);
-		} catch (error) {
+		const updatedActivity = await activities.patchActivity(activity.activity, data, c.env.DB);
+		if (!updatedActivity) {
 			return c.json(
 				{
-					code: 500,
-					message: `Failed to update activity: ${error instanceof Error ? error.message : 'Unknown error'}`
+					code: 404,
+					message: `Activity with ID ${id} not found`
 				},
-				500
+				404
 			);
 		}
+
+		return c.json(updatedActivity.public, 200);
 	}
 );
 
@@ -217,28 +197,18 @@ activity.delete(
 			);
 		}
 
-		try {
-			const result = await activities.deleteActivity(id, c.env.DB);
-			if (!result) {
-				return c.json(
-					{
-						code: 404,
-						message: `Activity with ID ${id} not found`
-					},
-					404
-				);
-			}
-
-			return c.body(null, 204);
-		} catch (error) {
+		const result = await activities.deleteActivity(id, c.env.DB);
+		if (!result) {
 			return c.json(
 				{
-					code: 500,
-					message: `Failed to delete activity: ${error instanceof Error ? error.message : 'Unknown error'}`
+					code: 404,
+					message: `Activity with ID ${id} not found`
 				},
-				500
+				404
 			);
 		}
+
+		return c.body(null, 204);
 	}
 );
 

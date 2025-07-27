@@ -94,21 +94,11 @@ setUserActivities.patch(
 			);
 		}
 
-		try {
-			const user = res.data;
-			user.account.setActivities(activities.map((activity) => activity?.activity) as com.earthapp.activity.Activity[]);
+		const user = res.data;
+		user.account.setActivities(activities.map((activity) => activity?.activity) as com.earthapp.activity.Activity[]);
 
-			await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
-			return c.json(user.public, 200);
-		} catch (error) {
-			return c.json(
-				{
-					code: 500,
-					message: `Failed to set activities: ${error instanceof Error ? error.message : 'Unknown error'}`
-				},
-				500
-			);
-		}
+		await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
+		return c.json(user.public, 200);
 	}
 );
 
