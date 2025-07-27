@@ -410,6 +410,10 @@ export async function patchUser(account: com.earthapp.account.Account, bindings:
 	if (data) {
 		newAccount = account.deepCopy() as com.earthapp.account.Account;
 		try {
+			if (data.username && (await doesUsernameExist(data.username, bindings)) && data.username !== account.username) {
+				throw new HTTPException(400, { message: `Username "${data.username}" is already taken.` });
+			}
+
 			newAccount.patch(
 				data.username ?? account.username,
 				(data.firstName ?? account.firstName) || 'John',
@@ -453,7 +457,9 @@ export const userProfilePhotoPrompt = (user: User) => {
 		The profile picture should be a special representation of the user as a whole, so include lots of vibrant colors and effects in every corner.
 		The photo should be around inanimate objects or attributes, avoiding things like people or animals, or symbols that represent them (like toys or paintings.)
 
-		The style of the profile picture should be in a flat, colorful, painting-like tone and style.
+		The style of the profile picture should be in a flat, colorful, painting-like tone and style. Whatever you choose, make sure it is vibrant and colorful.
+        There should be no text, logos, or any other elements that could be considered as a watermark or branding. The primary object should be placed in the
+        center of the image. The background should be a simple, abstract design that complements the primary object without distracting from it.
 
 		For more information about the user, here is the user's biography:
 		"${user.account.bio ?? 'No biography provided.'}"
