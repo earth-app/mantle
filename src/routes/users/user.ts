@@ -14,51 +14,27 @@ import userFriends from './friends';
 // Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
-import { User, UserObject } from '../../types/users';
-import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer } from '../../util/authentication';
+import { User } from '../../types/users';
+import { bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
-import { deleteUser, getUserById, getUserByUsername, getUserFromContext, patchUser } from '../../util/routes/users';
+import * as users from '../../util/routes/users';
 
 const user = new Hono<{ Bindings: Bindings }>();
 
 // Get User
 user.get('/', async (c) => {
-	const path = c.req.param('id');
-	let user: UserObject | null;
-
-	// Current User
-	if (!path) {
-		user = await getOwnerOfBearer(c);
-		if (!user) {
-			return c.json(
-				{
-					code: 401,
-					message: 'Unauthorized'
-				},
-				401
-			);
-		}
-	} else {
-		if (path.startsWith('@')) {
-			// By Username
-			const username = path.slice(1);
-			user = await getUserByUsername(username, c.env);
-		} else {
-			// By ID
-			user = await getUserById(path, c.env);
-		}
-	}
-
-	if (!user) {
+	const res = await users.getUserFromContext(c);
+	if (!res.data) {
 		return c.json(
 			{
-				code: 404,
-				message: 'User not found'
+				code: res.status,
+				message: res.message
 			},
-			404
+			res.status
 		);
 	}
+	const user = res.data;
 
 	const visibility = checkVisibility(user.account.visibility, c);
 	if (!visibility.success) {
@@ -103,7 +79,7 @@ user.patch(
 			);
 		}
 
-		const res = await getUserFromContext(c);
+		const res = await users.getAuthenticatedUserFromContext(c);
 		if (!res.data) {
 			return c.json(
 				{
@@ -125,14 +101,14 @@ user.patch(
 		}
 
 		// Update user properties
-		const returned = await patchUser(user.account, c.env, data);
+		const returned = await users.patchUser(user.account, c.env, data);
 		return c.json(returned, 200);
 	}
 );
 
 // Delete User
 user.delete('/', bearerAuthMiddleware(), async (c) => {
-	const res = await getUserFromContext(c);
+	const res = await users.getAuthenticatedUserFromContext(c);
 	if (!res.data) {
 		return c.json(
 			{
@@ -145,7 +121,7 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 	const user = res.data;
 
 	try {
-		const result = await deleteUser(user.account.id, c.env);
+		const result = await users.deleteUser(user.account.id, c.env);
 		if (!result) {
 			return c.json(
 				{
@@ -223,7 +199,7 @@ user.patch(
 			);
 		}
 
-		const res = await getUserFromContext(c);
+		const res = await users.getAuthenticatedUserFromContext(c);
 		if (!res.data) {
 			return c.json(
 				{
@@ -250,8 +226,116 @@ user.patch(
 			);
 		}
 
-		const updated = await patchUser(user.account, c.env);
+		const updated = await users.patchUser(user.account, c.env);
 		return c.json(updated, 200);
+	}
+);
+
+// Get Profile Photo
+user.get(
+	'/profile_photo',
+	describeRoute({
+		summary: "Get a user's Profile Photo",
+		description: 'Returns the profile photo for the user.',
+		security: [{ BearerAuth: [] }],
+		responses: {
+			200: {
+				description: 'Profile photo',
+				content: {
+					'image/jpeg': {}
+				}
+			},
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found'
+			}
+		},
+		tags: [tags.USERS]
+	}),
+	async (c) => {
+		const res = await users.getUserFromContext(c);
+		if (!res.data) {
+			return c.json(
+				{
+					code: res.status,
+					message: res.message
+				},
+				res.status
+			);
+		}
+
+		try {
+			const user = res.data;
+			const profile = await users.getProfilePhoto(user.public, c.env);
+
+			c.res.headers.set('Content-Type', 'image/jpeg');
+			c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
+
+			return c.body(profile, 200);
+		} catch (error) {
+			return c.json(
+				{
+					code: 500,
+					message: `Failed to get profile photo: ${error instanceof Error ? error.message : 'Unknown error'}`
+				},
+				500
+			);
+		}
+	}
+);
+
+// Regenerate Profile Photo
+user.put(
+	'/profile_photo',
+	describeRoute({
+		summary: "Regenerate a user's Profile Photo",
+		description: 'Regenerates the profile photo for the user.',
+		security: [{ BearerAuth: [] }],
+		responses: {
+			201: {
+				description: 'Profile photo regenerated successfully',
+				content: {
+					'image/jpeg': {}
+				}
+			},
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found'
+			}
+		},
+		tags: [tags.USERS]
+	}),
+	async (c) => {
+		const res = await users.getAuthenticatedUserFromContext(c);
+		if (!res.data) {
+			return c.json(
+				{
+					code: res.status,
+					message: res.message
+				},
+				res.status
+			);
+		}
+
+		try {
+			const user = res.data;
+			const profile = await users.newProfilePhoto(user.public, c.env);
+
+			c.res.headers.set('Content-Type', 'image/jpeg');
+			c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
+
+			return c.body(profile, 201);
+		} catch (error) {
+			return c.json(
+				{
+					code: 500,
+					message: `Failed to regenerate profile photo: ${error instanceof Error ? error.message : 'Unknown error'}`
+				},
+				500
+			);
+		}
 	}
 );
 

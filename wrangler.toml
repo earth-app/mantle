@@ -2,15 +2,21 @@ name = "earthapp-mantle"
 main = "src/index.ts"
 compatibility_date = "2025-04-28"
 compatibility_flags = [ "nodejs_compat"]
-assets = { directory = "public" }
 routes = [
     { pattern = "api.earth-app.com", custom_domain = true }
 ]
 send_metrics = false
 
+[assets]
+directory = "public"
+binding = "ASSETS"
+
 [observability]
 enabled = true
 head_sampling_rate = 1
+
+[ai]
+binding = "AI"
 
 [[d1_databases]]
 binding = "DB"
@@ -20,6 +26,11 @@ database_id = "4c88abe1-6768-4f17-8cc6-8b8e41475a34"
 [[kv_namespaces]]
 binding = "KV"
 id = "322faefd5628471cb7cea08cf041804a"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "earth-app"
+preview_bucket_name = "earth-app-preview"
 
 [[unsafe.bindings]]
 name = "ANONYMOUS_RATE_LIMIT"

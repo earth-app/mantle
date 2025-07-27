@@ -12,7 +12,7 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../../bindings';
 import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getActivityById } from '../../../util/routes/activities';
-import { getUserFromContext, updateUser } from '../../../util/routes/users';
+import { getAuthenticatedUserFromContext, updateUser } from '../../../util/routes/users';
 
 const setUserActivities = new Hono<{ Bindings: Bindings }>();
 
@@ -83,7 +83,7 @@ setUserActivities.patch(
 			);
 		}
 
-		const res = await getUserFromContext(c);
+		const res = await getAuthenticatedUserFromContext(c);
 		if (!res.data) {
 			return c.json(
 				{

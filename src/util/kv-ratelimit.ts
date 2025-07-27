@@ -65,7 +65,7 @@ export async function checkKVRateLimit(kv: KVNamespace, config: RateLimitConfig,
 
 		// Increment the counter
 		const newCount = currentCount + 1;
-		const ttl = Math.ceil((resetTime - currentTime) / 1000); // TTL in seconds
+		const ttl = Math.max(60, Math.ceil((resetTime - currentTime) / 1000)); // TTL in seconds
 
 		await kv.put(key, newCount.toString(), { expirationTtl: ttl });
 

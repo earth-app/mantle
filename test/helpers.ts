@@ -37,6 +37,41 @@ export interface MockBindings {
 	ADMIN_API_KEY: string;
 }
 
+export const MOCK_BINDINGS: MockBindings = {
+	DB: (globalThis as any).mockBindings?.DB || {
+		prepare: () => ({
+			bind: () => ({
+				run: () => Promise.resolve({ success: true }),
+				first: () => Promise.resolve(null),
+				all: () => Promise.resolve({ results: [] }),
+				raw: null
+			}),
+			run: () => Promise.resolve({ success: true }),
+			first: () => Promise.resolve(null),
+			all: () => Promise.resolve({ results: [] }),
+			raw: null
+		}),
+		batch: () => Promise.resolve([]),
+		exec: () => Promise.resolve({}),
+		withSession: (fn: any) => fn({}),
+		dump: () => Promise.resolve(new ArrayBuffer(0))
+	},
+	KV: (globalThis as any).mockBindings?.KV || {
+		get: () => Promise.resolve(null),
+		put: () => Promise.resolve(undefined),
+		delete: () => Promise.resolve(undefined)
+	},
+	ANONYMOUS_RATE_LIMIT: (globalThis as any).mockBindings?.ANONYMOUS_RATE_LIMIT || {
+		limit: () => Promise.resolve({ success: true })
+	},
+	AUTH_RATE_LIMIT: (globalThis as any).mockBindings?.AUTH_RATE_LIMIT || {
+		limit: () => Promise.resolve({ success: true })
+	},
+	KEK: 'LSBiwQgmG0gCPjYONDSWTBgSyX8xfqFasFY6G0exI94=',
+	LOOKUP_HMAC_KEY: 'Lu2ZWrAohkp/lJTL0T4l2f3cpuzsL8v9NLW7C3o+/rY=',
+	ADMIN_API_KEY: 'EA25K24Gbc7892e1c5ae7d9fd2af73b4QL4DX'
+};
+
 /**
  * Create a mock Hono context for testing
  */
@@ -48,42 +83,6 @@ export function createMockContext(options: {
 	env?: Partial<MockBindings>;
 }): Context<{ Bindings: MockBindings }> {
 	const { method = 'GET', url = 'http://localhost/', headers = {}, body, env = {} } = options;
-
-	const mockBindings: MockBindings = {
-		DB: (globalThis as any).mockBindings?.DB || {
-			prepare: () => ({
-				bind: () => ({
-					run: () => Promise.resolve({ success: true }),
-					first: () => Promise.resolve(null),
-					all: () => Promise.resolve({ results: [] }),
-					raw: null
-				}),
-				run: () => Promise.resolve({ success: true }),
-				first: () => Promise.resolve(null),
-				all: () => Promise.resolve({ results: [] }),
-				raw: null
-			}),
-			batch: () => Promise.resolve([]),
-			exec: () => Promise.resolve({}),
-			withSession: (fn: any) => fn({}),
-			dump: () => Promise.resolve(new ArrayBuffer(0))
-		},
-		KV: (globalThis as any).mockBindings?.KV || {
-			get: () => Promise.resolve(null),
-			put: () => Promise.resolve(undefined),
-			delete: () => Promise.resolve(undefined)
-		},
-		ANONYMOUS_RATE_LIMIT: (globalThis as any).mockBindings?.ANONYMOUS_RATE_LIMIT || {
-			limit: () => Promise.resolve({ success: true })
-		},
-		AUTH_RATE_LIMIT: (globalThis as any).mockBindings?.AUTH_RATE_LIMIT || {
-			limit: () => Promise.resolve({ success: true })
-		},
-		KEK: 'LSBiwQgmG0gCPjYONDSWTBgSyX8xfqFasFY6G0exI94=',
-		LOOKUP_HMAC_KEY: 'Lu2ZWrAohkp/lJTL0T4l2f3cpuzsL8v9NLW7C3o+/rY=',
-		ADMIN_API_KEY: 'EA25K24Gbc7892e1c5ae7d9fd2af73b4QL4DX',
-		...env
-	};
 
 	const request = new Request(url, {
 		method,
@@ -139,7 +138,10 @@ export function createMockContext(options: {
 		res: {
 			headers: new Headers()
 		},
-		env: mockBindings,
+		env: {
+			...MOCK_BINDINGS,
+			...env
+		},
 		json: (data: unknown, status?: number) =>
 			new Response(JSON.stringify(data), {
 				status: status || 200,
@@ -189,4 +191,4 @@ export const MOCK_ADMIN_TOKEN = 'EA25K24Gbc7892e1c5ae7d9fd2af73b4QL4DX';
 /**
  * Mock regular user token for testing
  */
-export const MOCK_USER_TOKEN = 'EA25MockUserToken1234567890123456789012345678901234567890';
+export const MOCK_USER_TOKEN = 'EA25K24Hbc8192ab27fd7d9fd2af74a4XLQ56';

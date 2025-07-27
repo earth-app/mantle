@@ -9,7 +9,7 @@ import * as tags from '../../../openapi/tags';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../../bindings';
 import { bearerAuthMiddleware } from '../../../util/authentication';
-import { getUserById, getUserFromContext, updateUser } from '../../../util/routes/users';
+import { getAuthenticatedUserFromContext, getUserById, updateUser } from '../../../util/routes/users';
 
 const addUserFriend = new Hono<{ Bindings: Bindings }>();
 
@@ -59,7 +59,7 @@ addUserFriend.put(
 			);
 		}
 
-		const res = await getUserFromContext(c);
+		const res = await getAuthenticatedUserFromContext(c);
 		if (!res.data) {
 			return c.json(
 				{

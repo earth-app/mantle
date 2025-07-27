@@ -1,8 +1,11 @@
-import { D1Database, KVNamespace } from '@cloudflare/workers-types';
+import { Ai, D1Database, Fetcher, KVNamespace, R2Bucket } from '@cloudflare/workers-types';
 
 type Bindings = {
 	DB: D1Database;
 	KV: KVNamespace;
+	R2: R2Bucket;
+	AI: Ai;
+	ASSETS: Fetcher;
 	ANONYMOUS_RATE_LIMIT: any;
 	AUTH_RATE_LIMIT: any;
 

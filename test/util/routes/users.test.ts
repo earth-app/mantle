@@ -23,7 +23,7 @@ describe('Users Utility Functions', () => {
 			expect(typeof users.checkTableExists).toBe('function');
 			expect(typeof users.updateUser).toBe('function');
 			expect(typeof users.loginUser).toBe('function');
-			expect(typeof users.getUserFromContext).toBe('function');
+			expect(typeof users.getAuthenticatedUserFromContext).toBe('function');
 			expect(typeof users.getUsers).toBe('function');
 			expect(typeof users.getAccountBy).toBe('function');
 			expect(typeof users.patchUser).toBe('function');
@@ -307,7 +307,7 @@ describe('Users Utility Functions', () => {
 		});
 
 		it('should handle getUserFromContext function', async () => {
-			const { getUserFromContext } = await import('../../../src/util/routes/users');
+			const { getAuthenticatedUserFromContext: getUserFromContext } = await import('../../../src/util/routes/users');
 
 			// Mock context
 			const mockContext = {

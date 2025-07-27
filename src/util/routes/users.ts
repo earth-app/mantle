@@ -1,8 +1,8 @@
-import { D1Database } from '@cloudflare/workers-types';
+import { Ai, D1Database } from '@cloudflare/workers-types';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { LoginUser, User, UserObject, toUser } from '../../types/users';
-import { addSession, getOwnerOfToken } from '../authentication';
+import { addSession, getOwnerOfBearer, getOwnerOfToken } from '../authentication';
 import * as encryption from '../encryption';
 import * as util from '../util';
 
@@ -209,6 +209,50 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Promise<{
 	data: UserObject | null;
 	message: string;
+	status: 200 | 401 | 404;
+}> {
+	const path = c.req.param('id');
+	let user: UserObject | null;
+
+	// Current User
+	if (!path) {
+		user = await getOwnerOfBearer(c);
+		if (!user) {
+			return {
+				data: null,
+				status: 401,
+				message: 'Unauthorized'
+			};
+		}
+	} else {
+		if (path.startsWith('@')) {
+			// By Username
+			const username = path.slice(1);
+			user = await getUserByUsername(username, c.env);
+		} else {
+			// By ID
+			user = await getUserById(path, c.env);
+		}
+	}
+
+	if (!user) {
+		return {
+			data: null,
+			status: 404,
+			message: 'User not found'
+		};
+	}
+
+	return {
+		data: user,
+		message: 'User found',
+		status: 200
+	};
+}
+
+export async function getAuthenticatedUserFromContext(c: Context<{ Bindings: Bindings }>): Promise<{
+	data: UserObject | null;
+	message: string;
 	status: 200 | 400 | 401 | 403 | 404;
 }> {
 	const bearerToken = c.req.header('Authorization');
@@ -395,4 +439,81 @@ export async function deleteUser(id: string, bindings: Bindings): Promise<boolea
 	const result = await bindings.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
 
 	return result.success;
+}
+
+// User profile photos
+
+const profileModel = '@cf/bytedance/stable-diffusion-xl-lightning';
+
+export const userProfilePhotoPrompt = (user: User) => {
+	return {
+		prompt: `
+		Generate a heavily expressive, artistic, colorful, vibrant, and unique profile picture for a user with the username "${user.username}."
+		The profile picture should be a special representation of the user as a whole, so include lots of vibrant colors and effects in every corner.
+		The photo should be around inanimate objects or attributes, avoiding things like people or animals, or symbols that represent them (like toys or paintings.)
+
+		The style of the profile picture should be in a flat, colorful, painting-like tone and style.
+
+		For more information about the user, here is the user's biography:
+		"${user.account.bio ?? 'No biography provided.'}"
+
+		The user lives in ${user.account.country ?? 'Unknown Country'}. Their name is "${user.fullName ?? 'No name provided.'}."
+
+		Lastly, the like the following activities:
+		${user.account.activities.map((activity) => `- ${activity.name}: ${activity.description?.substring(50) ?? 'No description available.'}\n`)}
+
+		If any field says "None Provided" or "Unknown," disregard that element as apart of the profile picture, as the user has omitted said details.
+		`.trim(),
+		negative_prompt: `Avoid elements of toys, scary elements, political or sensitive statements, and words.`,
+		guidance: 35
+	} satisfies AiTextToImageInput;
+};
+
+export async function generateProfilePhoto(user: User, ai: Ai): Promise<Uint8Array> {
+	const profile = await ai.run(profileModel, userProfilePhotoPrompt(user));
+
+	const reader = profile.getReader();
+	const chunks: Uint8Array[] = [];
+	let done = false;
+
+	while (!done) {
+		const { value, done: readerDone } = await reader.read();
+		done = readerDone;
+		if (value) {
+			chunks.push(value);
+		}
+	}
+
+	const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+	const imageBytes = new Uint8Array(totalLength);
+	let offset = 0;
+	for (const chunk of chunks) {
+		imageBytes.set(chunk, offset);
+		offset += chunk.length;
+	}
+
+	return imageBytes;
+}
+
+export async function getProfilePhoto(user: User, bindings: Bindings): Promise<Uint8Array> {
+	const profileImage = `users/${user.id}/profile.png`;
+
+	if (await bindings.R2.head(profileImage)) {
+		return (await bindings.R2.get(profileImage))!.bytes();
+	}
+
+	return (await bindings.ASSETS.fetch('https://assets.local/favicon.png'))!.bytes();
+}
+
+export async function newProfilePhoto(user: User, bindings: Bindings) {
+	const profileImage = `users/${user.id}/profile.png`;
+	if (await bindings.R2.head(profileImage)) {
+		// Delete existing profile photo
+		await bindings.R2.delete(profileImage);
+	}
+
+	const profile = await generateProfilePhoto(user, bindings.AI);
+	await bindings.R2.put(profileImage, profile);
+
+	return profile;
 }
