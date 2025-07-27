@@ -414,6 +414,7 @@ export async function patchUser(account: com.earthapp.account.Account, bindings:
 				data.username ?? account.username,
 				(data.firstName ?? account.firstName) || 'John',
 				(data.lastName ?? account.lastName) || 'Doe',
+				data.bio ?? account.bio,
 				data.email ?? account.email,
 				data.address ?? account.address,
 				data.country ?? account.country,
