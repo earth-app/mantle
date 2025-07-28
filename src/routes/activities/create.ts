@@ -7,6 +7,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
 
+import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import * as activities from '../../util/routes/activities';
 
@@ -42,8 +43,9 @@ createActivity.post(
 		tags: [tags.ACTIVITIES]
 	}),
 	async (c) => {
-		const { id, name, description, types } = await c.req.json();
+		const { id, name, description, types, aliases } = await c.req.json();
 		if (!id || !name || !types) {
+			console.warn('Missing required fields: id, name, types');
 			return c.json(
 				{
 					code: 400,
@@ -53,7 +55,19 @@ createActivity.post(
 			);
 		}
 
+		if (!Array.isArray(types) || types.length === 0) {
+			console.warn('Types must be a non-empty array');
+			return c.json(
+				{
+					code: 400,
+					message: 'Types must be a non-empty array'
+				},
+				400
+			);
+		}
+
 		if (await activities.doesActivityExist(id, c.env.DB)) {
+			console.warn(`Activity with ID ${id} already exists`);
 			return c.json(
 				{
 					code: 400,
@@ -63,9 +77,24 @@ createActivity.post(
 			);
 		}
 
+		if (aliases && !Array.isArray(aliases)) {
+			console.warn('Aliases should be an array of strings. Converting to lowercase and trimming each alias.');
+			return c.json(
+				{
+					code: 400,
+					message: 'Invalid aliases format'
+				},
+				400
+			);
+		}
+
 		const activity = activities.createActivity(id, name, (activity) => {
 			activity.description = description;
-			activity.types.asJsArrayView().push(...types);
+			activity.addTypes(types.map((type) => com.earthapp.activity.ActivityType.valueOf(type)));
+
+			if (aliases) {
+				activity.addAliases(aliases);
+			}
 		});
 
 		const obj = await activities.saveActivity(activity, c.env.DB);

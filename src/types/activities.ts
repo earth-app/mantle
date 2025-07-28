@@ -27,6 +27,7 @@ export type ActivityObject = {
 export type Activity = {
 	id: string;
 	name: string;
+	aliases?: string[];
 	description?: string;
 	types: (typeof com.earthapp.activity.ActivityType.prototype.name)[];
 	created_at?: Date;
@@ -44,6 +45,7 @@ export function toActivity(data: com.earthapp.activity.Activity, created_at: Dat
 	return {
 		id: data.id,
 		name: data.name,
+		aliases: data.aliases.asJsReadonlyArrayView().map((alias) => alias.toString()),
 		description: data.description ?? undefined,
 		types: data.types.asJsArrayView().map((type) => type.name),
 		created_at: created_at,

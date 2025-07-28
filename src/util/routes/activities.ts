@@ -2,6 +2,7 @@ import * as ocean from '@earth-app/ocean';
 import { com, kotlin } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import { Activity, ActivityObject, toActivity } from '../../types/activities';
+import { DBError } from '../../types/errors';
 
 // Helpers
 
@@ -31,12 +32,17 @@ export type DBActivity = {
 };
 
 function toActivityObject(activity: DBActivity): ActivityObject {
-	const activityClass = ocean.fromBinary(new Int8Array(activity.binary)) as com.earthapp.activity.Activity;
-	return {
-		public: toActivity(activityClass),
-		database: activity,
-		activity: activityClass
-	};
+	try {
+		const activityClass = ocean.fromBinary(new Int8Array(activity.binary)) as com.earthapp.activity.Activity;
+		return {
+			public: toActivity(activityClass),
+			database: activity,
+			activity: activityClass
+		};
+	} catch (error) {
+		console.error(`Failed to convert DBActivity to ActivityObject: ${error}`);
+		throw new DBError(`Failed to convert DBActivity to ActivityObject: ${error}`);
+	}
 }
 
 export async function checkTableExists(d1: D1Database) {
@@ -61,7 +67,7 @@ async function findActivity(query: string, d1: D1Database, ...params: any[]): Pr
 		.bind(...params)
 		.all<DBActivity>();
 
-	if (!row || !row.success) throw new Error(`No activities found for query: ${query} with params: '${params.join(', ')}'`);
+	if (!row || !row.success) throw new DBError(`No activities found for query: ${query} with params: '${params.join(', ')}'`);
 
 	return row.results.map((row) =>
 		toActivityObject({
@@ -79,7 +85,7 @@ export async function saveActivity(activity: com.earthapp.activity.Activity, d1:
 	const query = `INSERT INTO activities (id, binary) VALUES (?, ?)`;
 	const result = await d1.prepare(query).bind(activity.id, new Uint8Array(activity.toBinary())).run();
 
-	if (!result.success) throw new Error(`Failed to save activity with ID ${activity.id}: ${result.error}`);
+	if (!result.success) throw new DBError(`Failed to save activity with ID ${activity.id}: ${result.error}`);
 
 	const newActivity = toActivityObject({
 		id: activity.id,
@@ -96,9 +102,9 @@ export async function updateActivity(obj: ActivityObject, d1: D1Database): Promi
 	const query = `UPDATE activities SET binary = ?, updated_at = ? WHERE id = ? LIMIT 1`;
 	const updatedAt = new Date(); // Prevent mismatched timestamps in case SQL takes time
 
-	const result = await d1.prepare(query).bind(new Uint8Array(obj.activity.toBinary()), obj.activity.id).run();
+	const result = await d1.prepare(query).bind(new Uint8Array(obj.activity.toBinary()), updatedAt.toISOString(), obj.activity.id).run();
 
-	if (!result.success) throw new Error(`Failed to update activity with ID ${obj.activity.id}: ${result.error}`);
+	if (!result.success) throw new DBError(`Failed to update activity with ID ${obj.activity.id}: ${result.error}`);
 
 	const updatedActivity = toActivityObject({
 		id: obj.activity.id,
@@ -123,7 +129,7 @@ export async function deleteActivity(id: string, d1: D1Database): Promise<boolea
 export async function getActivities(d1: D1Database, limit: number = 25, page: number = 0, search: string = ''): Promise<ActivityObject[]> {
 	await checkTableExists(d1);
 
-	const query = `SELECT * FROM activities${search ? `WHERE name LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+	const query = `SELECT * FROM activities${search ? ` WHERE id LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
 	let results: ActivityObject[];
 
 	if (search) results = await findActivity(query, d1, `%${search}%`, limit, page * limit);
@@ -177,9 +183,18 @@ export async function patchActivity(
 		let types: kotlin.collections.KtList<com.earthapp.activity.ActivityType> | undefined = undefined;
 		if (data.types) {
 			types = kotlin.collections.KtList.fromJsArray(data.types.map((type) => com.earthapp.activity.ActivityType.valueOf(type)));
+		} else {
+			types = activityObject.activity.types;
 		}
 
-		newActivity = newActivity.patch(data.name ?? newActivity.name, data.description ?? newActivity.description, types);
+		let aliases: kotlin.collections.KtList<string> | undefined = undefined;
+		if (data.aliases) {
+			aliases = kotlin.collections.KtList.fromJsArray(data.aliases.map((alias) => alias.trim().toLowerCase()));
+		} else {
+			aliases = activityObject.activity.aliases;
+		}
+
+		newActivity = newActivity.patch(data.name ?? newActivity.name, data.description ?? newActivity.description, types, aliases);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to patch activity: ${error}` });
 	}
