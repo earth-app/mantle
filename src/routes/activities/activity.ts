@@ -67,7 +67,7 @@ activity.get(
 			);
 		}
 
-		return c.json(activity);
+		return c.json(activity.public, 200);
 	}
 );
 
@@ -84,7 +84,12 @@ activity.patch(
 				in: 'path',
 				description: 'ID of the activity to update',
 				required: true,
-				schema: schemas.idParam
+				schema: {
+					type: 'string',
+					example: 'coding',
+					description: 'The unique identifier of the activity to update',
+					minLength: 3
+				}
 			}
 		],
 		requestBody: {
@@ -130,6 +135,16 @@ activity.patch(
 		}
 
 		const data = await c.req.json();
+		if (!data || typeof data !== 'object') {
+			return c.json(
+				{
+					code: 400,
+					message: 'Invalid request body'
+				},
+				400
+			);
+		}
+
 		const activity = await activities.getActivityById(id, c.env.DB);
 		if (!activity) {
 			return c.json(
@@ -145,10 +160,10 @@ activity.patch(
 		if (!updatedActivity) {
 			return c.json(
 				{
-					code: 404,
-					message: `Activity with ID ${id} not found`
+					code: 400,
+					message: `Failed to update activity with ID ${id}`
 				},
-				404
+				400
 			);
 		}
 
