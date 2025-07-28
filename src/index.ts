@@ -13,6 +13,7 @@ import { globalRateLimit } from './util/ratelimit';
 import { HTTPException } from 'hono/http-exception';
 import * as packageJson from '../package.json';
 import Bindings from './bindings';
+import { DBError } from './types/errors';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -28,7 +29,18 @@ app.onError((err, c) => {
 		);
 	}
 
-	console.error('Unhandled error:', err);
+	if (err instanceof DBError) {
+		console.error('Database Error:', err);
+		return c.json(
+			{
+				code: 500,
+				message: `Database Error: ${err.message}`
+			},
+			500
+		);
+	}
+
+	console.error('Reported Error:', err);
 	return c.json(
 		{
 			code: 500,

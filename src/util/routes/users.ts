@@ -9,6 +9,7 @@ import * as util from '../util';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
+import { DBError } from '../../types/errors';
 
 // Helpers
 
@@ -21,7 +22,7 @@ export function createUser(username: string, callback: (user: com.earthapp.accou
 
 		return user;
 	} catch (error) {
-		throw new HTTPException(400, { message: `Failed to create user: ${error}` });
+		throw new DBError(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
 	}
 }
 
@@ -41,7 +42,7 @@ export type DBUser = {
 
 async function toUserObject(row: DBUser, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings): Promise<UserObject> {
 	const { binary, encryption_key, encryption_iv } = row;
-	if (!binary || !encryption_key || !encryption_iv) throw new HTTPException(500, { message: 'Missing required fields for decryption' });
+	if (!binary || !encryption_key || !encryption_iv) throw new DBError(`Missing required fields for decryption`);
 
 	const binary0 = new Uint8Array(binary);
 	const parsedKey = JSON.parse(encryption_key);
@@ -72,7 +73,7 @@ export async function checkTableExists(d1: D1Database) {
     )`;
 	const result = await d1.prepare(query).run();
 	if (result.error) {
-		throw new HTTPException(500, { message: `Failed to create users table: ${result.error}` });
+		throw new DBError(`Failed to create users table: ${result.error}`);
 	}
 
 	// Indexes for performance
@@ -106,7 +107,7 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 	const exists = `SELECT COUNT(*) as count FROM users WHERE id = ?`;
 	const countResult = await bindings.DB.prepare(exists).bind(user.id).first<{ count: number }>();
 
-	if (!countResult) throw new HTTPException(500, { message: 'Failed to check user existence' });
+	if (!countResult) throw new DBError(`Failed to check if user '${user.id}' exists`);
 
 	let result: D1Result;
 	if (countResult.count > 0) {
@@ -139,9 +140,7 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 			.run();
 	}
 
-	if (!result) throw new HTTPException(400, { message: 'Failed to save user' });
-
-	if (result.error) throw new HTTPException(400, { message: `Database error: ${result.error}` });
+	if (!result.success) throw new DBError(`Failed to save user '${user.id}': ${result.error}`);
 
 	return await getUserById(user.id, bindings);
 }
@@ -164,7 +163,7 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 	const query = `UPDATE users SET username = ?, binary = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
 
 	const res = await bindings.DB.prepare(query).bind(user.account.username, encryptedData, user.database.id).run();
-	if (!res.success) throw new HTTPException(400, { message: `Database error: ${res.error}` });
+	if (!res.success) throw new DBError(`Failed to update user '${user.account.id}': ${res.error}`);
 
 	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
 
@@ -186,7 +185,7 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 	await checkTableExists(bindings.DB);
 
 	const dbuser = await getUserByUsername(username, bindings);
-	if (!dbuser) throw new HTTPException(401, { message: 'User not found' });
+	if (!dbuser) throw new HTTPException(401, { message: 'User not found, not authorized' });
 
 	const user = dbuser.database;
 
@@ -272,6 +271,13 @@ export async function getAuthenticatedUserFromContext(c: Context<{ Bindings: Bin
 
 	// Current User
 	if (!path) {
+		if (token === c.env.ADMIN_API_KEY)
+			return {
+				data: null,
+				message: 'Admin API Key used, no user object attached',
+				status: 200
+			};
+
 		user = owner;
 		if (!user) {
 			return {
@@ -360,7 +366,7 @@ export async function getUsers(
 	if (search) results = await statement.bind(`%${search}%`, limit, page * limit).all<DBUser>();
 	else results = await statement.bind(limit, page * limit).all<DBUser>();
 
-	if (!results || results.error) throw new HTTPException(400, { message: `Database error: ${results.error}` });
+	if (!results || results.error) throw new DBError(`Failed to retrieve users: ${results.error}`);
 
 	return Promise.all(results.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
@@ -426,7 +432,7 @@ export async function patchUser(account: com.earthapp.account.Account, bindings:
 				com.earthapp.Visibility.valueOf(data.visibility ?? account.visibility.name)
 			);
 		} catch (error) {
-			throw new HTTPException(400, { message: `Failed to patch user: ${error instanceof Error ? error.message : 'Unknown error'}` });
+			throw new DBError(`Failed to patch user: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	} else {
 		newAccount = account;
