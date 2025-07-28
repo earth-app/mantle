@@ -15,7 +15,7 @@ import userFriends from './friends';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { User } from '../../types/users';
-import { bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
+import { adminMiddleware, bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
 import * as users from '../../util/routes/users';
@@ -286,6 +286,9 @@ user.put(
 		},
 		tags: [tags.USERS]
 	}),
+	authRateLimit(rateLimitConfigs.userUpdate),
+	globalRateLimit(true), // Authenticated rate limiting
+	bearerAuthMiddleware(),
 	async (c) => {
 		const res = await users.getAuthenticatedUserFromContext(c);
 		if (!res.data) {
@@ -305,6 +308,96 @@ user.put(
 		c.res.headers.set('Content-Disposition', 'inline; filename="profile.jpg"');
 
 		return c.body(profile, 201);
+	}
+);
+
+// Set Account Type
+user.put(
+	'/account_type',
+	describeRoute({
+		summary: 'Set Account Type [Admin Only]',
+		description: 'Sets the account type for the user. This is an admin-only operation.',
+		security: [{ BearerAuth: [] }],
+		parameters: [
+			{
+				name: 'account_type',
+				in: 'query',
+				required: true,
+				schema: {
+					type: 'string',
+					enum: com.earthapp.account.AccountType.values().map((type) => type.name.toLowerCase())
+				}
+			}
+		],
+		responses: {
+			200: {
+				description: 'Account type set successfully',
+				content: {
+					'application/json': {
+						schema: resolver(schemas.user)
+					}
+				}
+			},
+			400: schemas.badRequest,
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
+			404: {
+				description: 'User not found'
+			}
+		},
+		tags: [tags.USERS]
+	}),
+	authRateLimit(rateLimitConfigs.userUpdate),
+	globalRateLimit(true), // Authenticated rate limiting
+	adminMiddleware(),
+	async (c) => {
+		const accountType = c.req.query('account_type')?.toUpperCase();
+		if (!accountType) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Account type is required'
+				},
+				400
+			);
+		}
+
+		const type = com.earthapp.account.AccountType.values().find((t) => t.name === accountType);
+		if (!type) {
+			return c.json(
+				{
+					code: 400,
+					message: `Invalid account type: ${accountType}`
+				},
+				400
+			);
+		}
+
+		const res = await users.getAuthenticatedUserFromContext(c);
+		if (res.status !== 200) {
+			return c.json(
+				{
+					code: res.status,
+					message: res.message
+				},
+				res.status
+			);
+		}
+
+		if (!res.data) {
+			return c.json(
+				{
+					code: 404,
+					message: 'User not found'
+				},
+				404
+			);
+		}
+
+		const user = res.data;
+		user.account.type = type;
+		const updated = await users.updateUser(user, com.earthapp.account.Privacy.PRIVATE, c.env);
+		return c.json(updated.public, 200);
 	}
 );
 

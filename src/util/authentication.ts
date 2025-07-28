@@ -367,6 +367,7 @@ export function bearerAuthMiddleware() {
 	return bearerAuth({
 		verifyToken: async (token: string, c: Context) => {
 			if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
+			if (token === c.env.ADMIN_API_KEY) return true; // Admin API Key is always valid
 
 			if (token.startsWith('EA25')) return await isValidToken(token, c.env);
 
