@@ -116,6 +116,10 @@ export const eventType = z
 	.openapi({ example: 'IN_PERSON' });
 
 // Array Types
+export const stringArray = z.array(z.string()).openapi({
+	example: ['example1', 'example2', 'example3']
+});
+
 export const idArray = z.array(id).openapi({
 	example: ['eb9137b1272938', 'audyrehwJd9wjfoz98enfoaw']
 });

@@ -26,7 +26,11 @@ setUserActivities.patch(
 			required: true,
 			content: {
 				'application/json': {
-					schema: zodToJsonSchema(schemas.idArray) as OpenAPIV3.SchemaObject
+					schema: zodToJsonSchema(
+						schemas.stringArray.openapi({
+							example: ['activity1', 'activity2', 'activity3']
+						})
+					) as OpenAPIV3.SchemaObject
 				}
 			}
 		},
@@ -61,8 +65,8 @@ setUserActivities.patch(
 			);
 		}
 
-		const activityIds: string[] = await c.req.json();
-		if (!Array.isArray(activityIds) || activityIds.length === 0) {
+		const array: string[] = await c.req.json();
+		if (!Array.isArray(array) || array.length === 0) {
 			return c.json(
 				{
 					code: 400,
@@ -72,14 +76,19 @@ setUserActivities.patch(
 			);
 		}
 
-		const activities = await Promise.all(activityIds.map(async (id) => await getActivityById(id, c.env.DB)));
-		if (activities.some((activity) => !activity)) {
+		const activityIds = array
+			.filter(Boolean)
+			.filter((id) => array.indexOf(id) === array.lastIndexOf(id)) // Ensure unique IDs
+			.map((id) => id.trim())
+			.filter((id) => id.length > 0);
+
+		if (activityIds.length === 0) {
 			return c.json(
 				{
-					code: 404,
-					message: 'One or more activities not found'
+					code: 400,
+					message: 'No valid activity IDs provided'
 				},
-				404
+				400
 			);
 		}
 
@@ -95,6 +104,18 @@ setUserActivities.patch(
 		}
 
 		const user = res.data;
+
+		const activities = await Promise.all(activityIds.map(async (id) => await getActivityById(id, c.env.DB)));
+		if (activities.some((activity) => !activity)) {
+			return c.json(
+				{
+					code: 404,
+					message: 'One or more activities not found'
+				},
+				404
+			);
+		}
+
 		user.account.setActivities(activities.map((activity) => activity?.activity) as com.earthapp.activity.Activity[]);
 
 		await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
