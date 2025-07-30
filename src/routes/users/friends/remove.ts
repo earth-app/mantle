@@ -43,7 +43,7 @@ removeUserFriend.delete(
 				description: 'User not found'
 			}
 		},
-		tags: [tags.USERS]
+		tags: [tags.USERS, tags.USER_FRIENDS]
 	}),
 	bearerAuthMiddleware(),
 	async (c) => {
@@ -78,6 +78,16 @@ removeUserFriend.delete(
 					message: 'Friend not found'
 				},
 				404
+			);
+		}
+
+		if (!user.account.getFriendIds().has(friend.account.id)) {
+			return c.json(
+				{
+					code: 400,
+					message: 'User is not a friend'
+				},
+				400
 			);
 		}
 

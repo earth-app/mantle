@@ -11,26 +11,26 @@ import Bindings from '../../../bindings';
 import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getAuthenticatedUserFromContext, getUserById, updateUser } from '../../../util/routes/users';
 
-const addUserFriend = new Hono<{ Bindings: Bindings }>();
+const addUserCircle = new Hono<{ Bindings: Bindings }>();
 
-addUserFriend.put(
+addUserCircle.put(
 	'/',
 	describeRoute({
-		summary: 'Add a friend to the authenticated user',
-		description: 'Adds a user as a friend to the authenticated user.',
+		summary: "Add a user to the authenticated user's circle",
+		description: "Adds a user to the authenticated user's circle.",
 		security: [{ BearerAuth: [] }],
 		parameters: [
 			{
-				name: 'friendId',
+				name: 'userId',
 				in: 'query',
-				description: 'ID of the user to add as a friend',
+				description: 'ID of the user to add to the circle',
 				required: true,
 				schema: schemas.idParam
 			}
 		],
 		responses: {
 			200: {
-				description: 'Friend added successfully',
+				description: 'User added to circle successfully',
 				content: {
 					'application/json': {
 						schema: resolver(schemas.user)
@@ -48,12 +48,12 @@ addUserFriend.put(
 	}),
 	bearerAuthMiddleware(),
 	async (c) => {
-		const friendId = c.req.query('friendId');
-		if (!friendId || friendId.length !== com.earthapp.util.ID_LENGTH) {
+		const userId = c.req.query('userId');
+		if (!userId || userId.length !== com.earthapp.util.ID_LENGTH) {
 			return c.json(
 				{
 					code: 400,
-					message: 'Valid Friend ID is required'
+					message: 'Valid User ID is required'
 				},
 				400
 			);
@@ -71,42 +71,52 @@ addUserFriend.put(
 		}
 
 		const user = res.data;
-		const friend = await getUserById(friendId, c.env);
-		if (!friend) {
+		const circleUser = await getUserById(userId, c.env);
+		if (!circleUser) {
 			return c.json(
 				{
 					code: 404,
-					message: 'Friend not found'
+					message: 'User not found'
 				},
 				404
 			);
 		}
 
-		if (user.account.getFriendIds().asJsReadonlySetView().has(friend.account.id)) {
+		if (!user.account.isMutualFriend(circleUser.account)) {
+			return c.json(
+				{
+					code: 403,
+					message: `User ${circleUser.public.username} is not a mutual friend`
+				},
+				403
+			);
+		}
+
+		if (user.account.getCircle().asJsReadonlySetView().has(circleUser.account.id)) {
 			return c.json(
 				{
 					code: 409,
-					message: `User ${friend.public.username} is already a friend`
+					message: `User ${circleUser.public.username} is already in the circle`
 				},
 				409
 			);
 		}
 
-		if (user.account.id === friend.account.id) {
+		if (user.account.id === circleUser.account.id) {
 			return c.json(
 				{
 					code: 400,
-					message: 'You cannot add yourself as a friend'
+					message: 'Cannot add yourself to your own circle'
 				},
 				400
 			);
 		}
 
-		user.account.addFriend(friend.account);
+		user.account.addAccountToCircle(circleUser.account);
 		await updateUser(user, com.earthapp.Visibility.PRIVATE, c.env);
 
 		return c.json(user.public, 200);
 	}
 );
 
-export default addUserFriend;
+export default addUserCircle;

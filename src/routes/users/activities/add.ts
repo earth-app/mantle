@@ -45,7 +45,7 @@ addUserActivity.put(
 			},
 			409: schemas.duplicate
 		},
-		tags: [tags.USERS]
+		tags: [tags.USERS, tags.ACTIVITIES]
 	}),
 	bearerAuthMiddleware(),
 	async (c) => {

@@ -9,6 +9,7 @@ import * as tags from '../../openapi/tags';
 
 // User Routes
 import userActivities from './activities';
+import userCircle from './circle';
 import userFriends from './friends';
 
 // Implementation
@@ -403,5 +404,6 @@ user.put(
 
 user.route('/activities', userActivities);
 user.route('/friends', userFriends);
+user.route('/circle', userCircle);
 
 export default user;

@@ -6,8 +6,8 @@ import * as schemas from '../../../openapi/schemas';
 import * as tags from '../../../openapi/tags';
 
 // User Friends Routes
-import addUserFriend from './add';
-import removeUserFriend from './remove';
+import addUserCircle from './add';
+import removeUserCircle from './remove';
 
 // Implementation
 import Bindings from '../../../bindings';
@@ -15,17 +15,17 @@ import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getUserById, getUserFromContext } from '../../../util/routes/users';
 import { paginatedParameters } from '../../../util/util';
 
-const userFriends = new Hono<{ Bindings: Bindings }>();
+const userCircle = new Hono<{ Bindings: Bindings }>();
 
-userFriends.get(
+userCircle.get(
 	'/',
 	describeRoute({
-		summary: "Retrieve a user's friends",
-		description: 'Gets a list of friends for the authenticated user.',
+		summary: "Retrieve a user's circle",
+		description: "Gets a list of users in the authenticated user's circle.",
 		security: [{ BearerAuth: [] }],
 		responses: {
 			200: {
-				description: 'List of friends',
+				description: 'List of users in the circle',
 				content: {
 					'application/json': {
 						schema: resolver(schemas.paginated(schemas.user))
@@ -61,35 +61,35 @@ userFriends.get(
 		}
 
 		const user = res.data;
-		const friendIds = Array.from(user.account.getFriendIds().asJsReadonlySetView());
-		const friends = await Promise.all(
-			friendIds
+		const circleIds = Array.from(user.account.getCircle().asJsReadonlySetView());
+		const circle = await Promise.all(
+			circleIds
 				.filter((_, index) => index + 1 > (page - 1) * limit && index < page * limit)
 				.map(async (id) => {
-					const friend = await getUserById(id, c.env);
+					const circle = await getUserById(id, c.env);
 
-					if (friend) {
-						return friend.public;
+					if (circle) {
+						return circle.public;
 					}
 					return null;
 				})
 		);
 
-		const filteredFriends = friends.filter(Boolean).filter((friend) => !search || friend?.username.includes(search));
+		const filteredCircle = circle.filter(Boolean).filter((circle) => !search || circle?.username.includes(search));
 
 		return c.json(
 			{
 				page: page,
 				limit: limit,
-				total: filteredFriends.length,
-				items: filteredFriends
+				total: filteredCircle.length,
+				items: filteredCircle
 			},
 			200
 		);
 	}
 );
 
-userFriends.route('/add', addUserFriend);
-userFriends.route('/remove', removeUserFriend);
+userCircle.route('/add', addUserCircle);
+userCircle.route('/remove', removeUserCircle);
 
-export default userFriends;
+export default userCircle;

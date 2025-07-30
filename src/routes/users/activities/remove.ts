@@ -44,7 +44,7 @@ removeUserActivity.delete(
 				description: 'User or Activity not found'
 			}
 		},
-		tags: [tags.USERS]
+		tags: [tags.USERS, tags.ACTIVITIES]
 	}),
 	bearerAuthMiddleware(),
 	async (c) => {
