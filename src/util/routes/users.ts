@@ -213,9 +213,11 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Pr
 	const path = c.req.param('id');
 	let user: UserObject | null;
 
+	const owner = await getOwnerOfBearer(c);
+
 	// Current User
 	if (!path) {
-		user = await getOwnerOfBearer(c);
+		user = owner;
 		if (!user) {
 			return {
 				data: null,
@@ -224,13 +226,60 @@ export async function getUserFromContext(c: Context<{ Bindings: Bindings }>): Pr
 			};
 		}
 	} else {
+		let fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC;
+		if (owner) {
+			if (owner.account.isAdmin || owner.account.id === path || owner.account.username === path.slice(1)) {
+				fieldPrivacy = com.earthapp.account.Privacy.PRIVATE;
+			}
+		}
+
 		if (path.startsWith('@')) {
 			// By Username
 			const username = path.slice(1);
-			user = await getUserByUsername(username, c.env);
+			const user0 = await getUserByUsername(username, c.env);
+			if (!user0)
+				return {
+					status: 404,
+					message: 'Username not found',
+					data: null
+				};
+
+			if (owner && user0.account.isAccountInCircle(owner.account)) {
+				fieldPrivacy = com.earthapp.account.Privacy.CIRCLE;
+			}
+
+			if (owner && user0.account.isMutualFriend(owner.account)) {
+				fieldPrivacy = com.earthapp.account.Privacy.MUTUAL;
+			}
+
+			user = {
+				public: toUser(user0.account, fieldPrivacy, user0.database.created_at, user0.database.updated_at, user0.database.last_login),
+				database: user0.database,
+				account: user0.account
+			};
 		} else {
 			// By ID
-			user = await getUserById(path, c.env);
+			const user0 = await getUserById(path, c.env);
+			if (!user0)
+				return {
+					status: 404,
+					message: 'User ID not found',
+					data: null
+				};
+
+			if (owner && user0.account.isAccountInCircle(owner.account)) {
+				fieldPrivacy = com.earthapp.account.Privacy.CIRCLE;
+			}
+
+			if (owner && user0.account.isMutualFriend(owner.account)) {
+				fieldPrivacy = com.earthapp.account.Privacy.MUTUAL;
+			}
+
+			user = {
+				public: toUser(user0.account, fieldPrivacy, user0.database.created_at, user0.database.updated_at, user0.database.last_login),
+				database: user0.database,
+				account: user0.account
+			};
 		}
 	}
 
