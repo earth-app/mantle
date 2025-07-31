@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -19,6 +20,7 @@ createUser.post(
 	// Apply both KV rate limiting and existing Cloudflare rate limiting
 	ipRateLimit(rateLimitConfigs.userCreate),
 	globalRateLimit(false), // Anonymous rate limiting
+	zValidator('json', schemas.userCreate),
 	describeRoute({
 		summary: 'Create a new user',
 		description: 'Creates a new user within the Earth App',
@@ -45,17 +47,7 @@ createUser.post(
 		tags: [tags.USERS]
 	}),
 	async (c) => {
-		const req = await c.req.json();
-		const { username, email, password } = req;
-
-		if (!username || !email || !password)
-			return c.json(
-				{
-					code: 400,
-					message: 'Missing required fields'
-				},
-				400
-			);
+		const { username, email, password, firstName, lastName } = c.req.valid('json');
 
 		if (await users.doesUsernameExist(username, c.env))
 			return c.json(
@@ -79,9 +71,8 @@ createUser.post(
 		const user = await users.createUser(username, (user) => {
 			user.email = email;
 
-			if (req.firstName) user.firstName = req.firstName;
-
-			if (req.lastName) user.lastName = req.lastName;
+			if (firstName) user.firstName = firstName;
+			if (lastName) user.lastName = lastName;
 		});
 		if (!user) {
 			return c.json(

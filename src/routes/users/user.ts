@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -15,7 +16,6 @@ import userFriends from './friends';
 // Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
-import { User } from '../../types/users';
 import { adminMiddleware, bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
@@ -57,28 +57,9 @@ user.patch(
 	authRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
+	zValidator('json', schemas.userUpdate),
 	async (c) => {
-		const rawBody = await c.req.text();
-		if (!rawBody) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Request body cannot be empty'
-				},
-				400
-			);
-		}
-
-		let data: DeepPartial<User['account']> = await c.req.json();
-		if (!data || typeof data !== 'object') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid request body'
-				},
-				400
-			);
-		}
+		let data = c.req.valid('json');
 
 		const res = await users.getAuthenticatedUserFromContext(c);
 		if (!res.data) {
@@ -92,13 +73,6 @@ user.patch(
 		}
 
 		const user = res.data;
-		if (data.type || data.id) {
-			data = {
-				...data,
-				type: undefined, // Prevent type changes
-				id: undefined // Prevent ID changes
-			};
-		}
 
 		// Update user properties
 		const returned = await users.patchUser(user.account, c.env, data);
@@ -166,28 +140,9 @@ user.patch(
 	authRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
+	zValidator('json', schemas.userFieldPrivacy),
 	async (c) => {
-		const rawBody = await c.req.text();
-		if (!rawBody) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Request body cannot be empty'
-				},
-				400
-			);
-		}
-
-		let data: Partial<User['account']['field_privacy']> = await c.req.json();
-		if (!data || typeof data !== 'object') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid request body'
-				},
-				400
-			);
-		}
+		const data = c.req.valid('json');
 
 		const res = await users.getAuthenticatedUserFromContext(c);
 		if (!res.data) {

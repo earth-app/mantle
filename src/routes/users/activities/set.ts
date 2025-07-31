@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -18,6 +19,7 @@ const setUserActivities = new Hono<{ Bindings: Bindings }>();
 
 setUserActivities.patch(
 	'/',
+	zValidator('json', schemas.userActivitiesSet),
 	describeRoute({
 		summary: 'Set user activities',
 		description: 'Sets the activities associated with a user in the Earth App.',
@@ -26,11 +28,7 @@ setUserActivities.patch(
 			required: true,
 			content: {
 				'application/json': {
-					schema: zodToJsonSchema(
-						schemas.stringArray.openapi({
-							example: ['activity1', 'activity2', 'activity3']
-						})
-					) as OpenAPIV3.SchemaObject
+					schema: zodToJsonSchema(schemas.userActivitiesSet) as OpenAPIV3.SchemaObject
 				}
 			}
 		},
@@ -54,31 +52,10 @@ setUserActivities.patch(
 	}),
 	bearerAuthMiddleware(),
 	async (c) => {
-		const rawBody = await c.req.text();
-		if (!rawBody) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Request body cannot be empty'
-				},
-				400
-			);
-		}
-
-		const array: string[] = await c.req.json();
-		if (!Array.isArray(array) || array.length === 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Activities must be a non-empty array'
-				},
-				400
-			);
-		}
-
-		const activityIds = array
+		const body = c.req.valid('json');
+		const activityIds = body
 			.filter(Boolean)
-			.filter((id) => array.indexOf(id) === array.lastIndexOf(id)) // Ensure unique IDs
+			.filter((id) => body.indexOf(id) === body.lastIndexOf(id)) // Ensure unique IDs
 			.map((id) => id.trim())
 			.filter((id) => id.length > 0);
 

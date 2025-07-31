@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -15,6 +16,7 @@ const createActivity = new Hono<{ Bindings: Bindings }>();
 
 createActivity.post(
 	'/',
+	zValidator('json', schemas.activityCreate),
 	describeRoute({
 		summary: 'Create a new activity [Admin Only]',
 		description: 'Creates a new activity within the Earth App. Reserved for administrators.',
@@ -24,7 +26,7 @@ createActivity.post(
 			required: true,
 			content: {
 				'application/json': {
-					schema: zodToJsonSchema(schemas.activity) as OpenAPIV3.SchemaObject
+					schema: zodToJsonSchema(schemas.activityCreate) as OpenAPIV3.SchemaObject
 				}
 			}
 		},
@@ -43,28 +45,7 @@ createActivity.post(
 		tags: [tags.ACTIVITIES]
 	}),
 	async (c) => {
-		const { id, name, description, types, aliases } = await c.req.json();
-		if (!id || !name || !types) {
-			console.warn('Missing required fields: id, name, types');
-			return c.json(
-				{
-					code: 400,
-					message: 'Missing required fields: id, name, types'
-				},
-				400
-			);
-		}
-
-		if (!Array.isArray(types) || types.length === 0) {
-			console.warn('Types must be a non-empty array');
-			return c.json(
-				{
-					code: 400,
-					message: 'Types must be a non-empty array'
-				},
-				400
-			);
-		}
+		const { id, name, description, types, aliases } = c.req.valid('json');
 
 		if (await activities.doesActivityExist(id, c.env.DB)) {
 			console.warn(`Activity with ID ${id} already exists`);
@@ -77,19 +58,8 @@ createActivity.post(
 			);
 		}
 
-		if (aliases && !Array.isArray(aliases)) {
-			console.warn('Aliases should be an array of strings. Converting to lowercase and trimming each alias.');
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid aliases format'
-				},
-				400
-			);
-		}
-
 		const activity = activities.createActivity(id, name, (activity) => {
-			activity.description = description;
+			if (description) activity.description = description;
 			activity.addTypes(types.map((type) => com.earthapp.activity.ActivityType.valueOf(type)));
 
 			if (aliases) {

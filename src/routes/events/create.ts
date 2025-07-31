@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -18,6 +19,7 @@ const createEvent = new Hono<{ Bindings: Bindings }>();
 createEvent.post(
 	'/',
 	authRateLimit(rateLimitConfigs.eventCreate),
+	zValidator('json', schemas.eventCreate),
 	describeRoute({
 		summary: 'Create a new event',
 		description: 'Creates a new event within the Earth App',
@@ -46,54 +48,7 @@ createEvent.post(
 		tags: [tags.EVENTS]
 	}),
 	async (c) => {
-		const { name, description, type, location, date, end_date, visibility } = await c.req.json();
-		if (!name || !type || !date || !visibility) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Missing required fields: name, type, date, visibility'
-				},
-				400
-			);
-		}
-
-		if (location && (typeof location.latitude !== 'number' || typeof location.longitude !== 'number')) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid location format: must contain latitude and longitude as numbers'
-				},
-				400
-			);
-		}
-		if (typeof date !== 'number') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid date format: must be a timestamp in milliseconds'
-				},
-				400
-			);
-		}
-		if (end_date && typeof end_date !== 'number') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid end_date format: must be a timestamp in milliseconds'
-				},
-				400
-			);
-		}
-
-		if (com.earthapp.Visibility.values().indexOf(visibility) === -1) {
-			return c.json(
-				{
-					code: 400,
-					message: `Invalid visibility value (case sensitive): must be one of ${com.earthapp.Visibility.values().join(', ')}`
-				},
-				400
-			);
-		}
+		const { name, description, type, location, date, end_date, visibility } = c.req.valid('json');
 
 		const owner = await getOwnerOfBearer(c);
 		if (!owner) {
@@ -109,8 +64,10 @@ createEvent.post(
 		const event = events.createEvent(owner.database.id, (event) => {
 			event.name = name;
 			event.description = description || '';
-			event.type = type;
-			event.location = new com.earthapp.event.Location(location.latitude, location.longitude);
+			event.type = com.earthapp.event.EventType.valueOf(type);
+			if (location) {
+				event.location = new com.earthapp.event.Location(location.latitude, location.longitude);
+			}
 			event.date = date;
 			event.endDate = end_date || date;
 			event.visibility = com.earthapp.Visibility.valueOf(visibility);

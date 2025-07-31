@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -74,6 +75,7 @@ activity.get(
 // Patch Activity
 activity.patch(
 	'/',
+	zValidator('json', schemas.activityUpdate),
 	describeRoute({
 		summary: 'Update an activity by ID [Admin Only]',
 		description: 'Updates the details of a specific activity in the Earth App. This route is restricted to admin users.',
@@ -95,7 +97,7 @@ activity.patch(
 		requestBody: {
 			content: {
 				'application/json': {
-					schema: zodToJsonSchema(schemas.activity) as OpenAPIV3.SchemaObject
+					schema: zodToJsonSchema(schemas.activityUpdate) as OpenAPIV3.SchemaObject
 				}
 			}
 		},
@@ -134,16 +136,7 @@ activity.patch(
 			);
 		}
 
-		const data = await c.req.json();
-		if (!data || typeof data !== 'object') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid request body'
-				},
-				400
-			);
-		}
+		const data = c.req.valid('json');
 
 		const activity = await activities.getActivityById(id, c.env.DB);
 		if (!activity) {
@@ -156,7 +149,14 @@ activity.patch(
 			);
 		}
 
-		const updatedActivity = await activities.patchActivity(activity.activity, data, c.env.DB);
+		const updatedActivity = await activities.patchActivity(
+			activity.activity,
+			{
+				...data,
+				types: data.types?.map((type) => type as any)
+			},
+			c.env.DB
+		);
 		if (!updatedActivity) {
 			return c.json(
 				{

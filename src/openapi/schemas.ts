@@ -130,7 +130,9 @@ export const idArray = z.array(id).openapi({
 export const userCreate = z.object({
 	username: username,
 	password: password,
-	email: email
+	email: email,
+	firstName: z.string().min(1).max(30).optional(),
+	lastName: z.string().min(1).max(30).optional()
 });
 
 export const userUpdate = z
@@ -260,6 +262,66 @@ export const promptResponseBody = z
 		example: {
 			content: 'The meaning of life is 42.'
 		}
+	});
+
+export const articleCreate = z
+	.object({
+		title: text.max(48),
+		summary: text.max(512),
+		tags: z.array(text.max(30)).max(10).default([]),
+		content: text.min(50).max(10000)
+	})
+	.openapi({
+		example: {
+			title: 'Understanding Quantum Computing',
+			summary: 'A deep dive into the principles of quantum computing and its potential applications.',
+			tags: ['quantum', 'computing', 'technology'],
+			content:
+				'Quantum computing is a type of computation that harnesses the principles of quantum mechanics. ' +
+				'It uses quantum bits, or qubits, which can exist in multiple states simultaneously, allowing for parallel processing of information. ' +
+				'This capability enables quantum computers to solve certain problems much faster than classical computers.'
+		}
+	});
+
+export const activityCreate = z
+	.object({
+		id: z.string().openapi({ example: 'hiking' }),
+		name: text,
+		description: text.optional(),
+		types: z.array(activityType),
+		aliases: z.array(z.string()).optional()
+	})
+	.openapi({
+		example: {
+			id: 'hiking',
+			name: 'Hiking',
+			description: 'A fun outdoor activity',
+			types: ['HOBBY', 'SPORT'],
+			aliases: ['walking', 'trekking']
+		}
+	});
+
+export const activityUpdate = z
+	.object({
+		name: text.optional(),
+		description: text.optional(),
+		types: z.array(activityType).optional(),
+		aliases: z.array(z.string()).optional()
+	})
+	.openapi({
+		example: {
+			name: 'Mountain Hiking',
+			description: 'A challenging outdoor activity in the mountains',
+			types: ['HOBBY', 'SPORT'],
+			aliases: ['mountaineering', 'trekking']
+		}
+	});
+
+export const userActivitiesSet = z
+	.array(z.string())
+	.min(1)
+	.openapi({
+		example: ['hiking', 'swimming', 'cycling']
 	});
 
 /// Return Objects

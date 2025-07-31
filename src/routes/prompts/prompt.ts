@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -91,6 +92,7 @@ prompt.patch(
 	'/',
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptUpdate),
+	zValidator('json', schemas.promptCreate),
 	describeRoute({
 		summary: 'Update a specific prompt by ID',
 		description: 'Updates the details of a specific prompt in the Earth App.',
@@ -151,16 +153,7 @@ prompt.patch(
 			);
 		}
 
-		const { prompt, visibility } = await c.req.json();
-		if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt is required and must be a non-empty string.'
-				},
-				400
-			);
-		}
+		const { prompt, visibility } = c.req.valid('json');
 
 		const owner = await getOwnerOfBearer(c);
 		if (!owner) {
@@ -194,7 +187,15 @@ prompt.patch(
 			);
 		}
 
-		const updatedPrompt = await prompts.updatePrompt(promptId, { ...existingPrompt, prompt, visibility }, c.env.DB);
+		const updatedPrompt = await prompts.updatePrompt(
+			promptId,
+			{
+				...existingPrompt,
+				prompt,
+				visibility: visibility as 'PRIVATE' | 'CIRCLE' | 'MUTUAL' | 'PUBLIC'
+			},
+			c.env.DB
+		);
 		return c.json(updatedPrompt, 200);
 	}
 );
@@ -359,6 +360,7 @@ prompt.post(
 	'/responses',
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptResponseCreate),
+	zValidator('json', schemas.promptResponseBody),
 	describeRoute({
 		summary: 'Create a new prompt response',
 		description: 'Creates a new response to a specific prompt in the Earth App.',
@@ -419,26 +421,7 @@ prompt.post(
 			);
 		}
 
-		const { content } = await c.req.json();
-		if (!content || typeof content !== 'string' || content.trim() === '') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Content is required and must be a non-empty string.'
-				},
-				400
-			);
-		}
-
-		if (content.length > 700) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Content must be at most 700 characters long.'
-				},
-				400
-			);
-		}
+		const { content } = c.req.valid('json');
 
 		const existingPrompt = await prompts.getPromptById(id, c.env.DB);
 		if (!existingPrompt) {
@@ -581,6 +564,7 @@ prompt.patch(
 	'/responses/:responseId',
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptResponseUpdate),
+	zValidator('json', schemas.promptResponseBody),
 	describeRoute({
 		summary: 'Update a specific prompt response by ID',
 		description: 'Updates a specific response to a prompt in the Earth App.',
@@ -648,17 +632,7 @@ prompt.patch(
 			);
 		}
 
-		const { content: response } = await c.req.json();
-
-		if (!response || typeof response !== 'string' || response.trim() === '') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Content is required and must be a non-empty string.'
-				},
-				400
-			);
-		}
+		const { content: response } = c.req.valid('json');
 
 		const owner = await getOwnerOfBearer(c);
 		if (!owner) {

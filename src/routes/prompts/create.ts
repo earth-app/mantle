@@ -1,3 +1,4 @@
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
 import { describeRoute } from 'hono-openapi';
@@ -19,6 +20,7 @@ const createPrompt = new Hono<{ Bindings: Bindings }>();
 createPrompt.post(
 	'/',
 	authRateLimit(rateLimitConfigs.promptCreate),
+	zValidator('json', schemas.promptCreate),
 	describeRoute({
 		summary: 'Create a new prompt',
 		description: 'Creates a new prompt in the Earth App.',
@@ -48,27 +50,7 @@ createPrompt.post(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const { prompt, visibility } = await c.req.json();
-
-		if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt is required and must be a non-empty string.'
-				},
-				400
-			);
-		}
-
-		if (visibility && typeof visibility !== 'string') {
-			return c.json(
-				{
-					code: 400,
-					message: 'Invalid visibility type.'
-				},
-				400
-			);
-		}
+		const { prompt, visibility } = c.req.valid('json');
 
 		const owner = await getOwnerOfBearer(c);
 		if (!owner) {
