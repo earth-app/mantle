@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 import Bindings from '../../bindings';
 import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
@@ -20,7 +20,7 @@ createUser.post(
 	// Apply both KV rate limiting and existing Cloudflare rate limiting
 	ipRateLimit(rateLimitConfigs.userCreate),
 	globalRateLimit(false), // Anonymous rate limiting
-	zValidator('json', schemas.userCreate),
+	validateMiddleware('json', schemas.userCreate),
 	describeRoute({
 		summary: 'Create a new user',
 		description: 'Creates a new user within the Earth App',

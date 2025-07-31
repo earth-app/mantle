@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 // User Routes
 import userActivities from './activities';
@@ -16,6 +16,7 @@ import userFriends from './friends';
 // Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
+import { ValidationError } from '../../types/errors';
 import { adminMiddleware, bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
@@ -57,7 +58,7 @@ user.patch(
 	authRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
-	zValidator('json', schemas.userUpdate),
+	validateMiddleware('json', schemas.userUpdate),
 	async (c) => {
 		let data = c.req.valid('json');
 
@@ -111,6 +112,9 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 // Change Field Privacy
 user.patch(
 	'/field_privacy',
+	authRateLimit(rateLimitConfigs.userUpdate),
+	globalRateLimit(true), // Authenticated rate limiting
+	validateMiddleware('json', schemas.userFieldPrivacy),
 	describeRoute({
 		summary: 'Change Field Privacy',
 		description: 'Change the visibility of account fields in the user account.',
@@ -137,10 +141,7 @@ user.patch(
 		},
 		tags: [tags.USERS]
 	}),
-	authRateLimit(rateLimitConfigs.userUpdate),
-	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
-	zValidator('json', schemas.userFieldPrivacy),
 	async (c) => {
 		const data = c.req.valid('json');
 
@@ -158,6 +159,10 @@ user.patch(
 		const user = res.data;
 		try {
 			for (const [key, value] of Object.entries(data)) {
+				if (typeof value !== 'string') {
+					throw new ValidationError(`Invalid value type for field ${key}: expected string`);
+				}
+
 				const privacy = com.earthapp.account.Privacy.valueOf(value.toUpperCase());
 				user.account.setFieldPrivacy(key, privacy);
 			}

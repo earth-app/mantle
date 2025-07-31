@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 // Implementation
 import { com } from '@earth-app/ocean';
@@ -20,7 +20,7 @@ const createPrompt = new Hono<{ Bindings: Bindings }>();
 createPrompt.post(
 	'/',
 	authRateLimit(rateLimitConfigs.promptCreate),
-	zValidator('json', schemas.promptCreate),
+	validateMiddleware('json', schemas.promptCreate),
 	describeRoute({
 		summary: 'Create a new prompt',
 		description: 'Creates a new prompt in the Earth App.',

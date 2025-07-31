@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
@@ -12,13 +11,16 @@ import * as tags from '../../openapi/tags';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
+import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { newArticle, newArticleObject } from '../../util/routes/articles';
+import { validateMiddleware } from '../../util/validation';
 
 const createArticle = new Hono<{ Bindings: Bindings }>();
 
 createArticle.post(
 	'/',
-	zValidator('json', schemas.articleCreate),
+	authRateLimit(rateLimitConfigs.articleCreate),
+	validateMiddleware('json', schemas.articleCreate),
 	describeRoute({
 		summary: 'Create a new article',
 		description: 'Creates a new article in the Earth App.',

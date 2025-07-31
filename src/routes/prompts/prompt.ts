@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 // Implementation
 import { com } from '@earth-app/ocean';
@@ -92,7 +92,7 @@ prompt.patch(
 	'/',
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptUpdate),
-	zValidator('json', schemas.promptCreate),
+	validateMiddleware('json', schemas.promptCreate),
 	describeRoute({
 		summary: 'Update a specific prompt by ID',
 		description: 'Updates the details of a specific prompt in the Earth App.',
@@ -360,7 +360,7 @@ prompt.post(
 	'/responses',
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptResponseCreate),
-	zValidator('json', schemas.promptResponseBody),
+	validateMiddleware('json', schemas.promptResponseBody),
 	describeRoute({
 		summary: 'Create a new prompt response',
 		description: 'Creates a new response to a specific prompt in the Earth App.',
@@ -564,7 +564,7 @@ prompt.patch(
 	'/responses/:responseId',
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptResponseUpdate),
-	zValidator('json', schemas.promptResponseBody),
+	validateMiddleware('json', schemas.promptResponseBody),
 	describeRoute({
 		summary: 'Update a specific prompt response by ID',
 		description: 'Updates a specific response to a prompt in the Earth App.',

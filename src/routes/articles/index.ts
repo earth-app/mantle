@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 // Articles Routes
 import article from './article';
@@ -18,7 +18,7 @@ const articles = new Hono<{ Bindings: Bindings }>();
 
 articles.get(
 	'/',
-	zValidator('query', schemas.paginatedParams),
+	validateMiddleware('query', schemas.paginatedParams),
 	describeRoute({
 		summary: 'Get all articles',
 		description: 'Retrieves a paginated list of all articles.',

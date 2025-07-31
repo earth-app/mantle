@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../../openapi/schemas';
 import * as tags from '../../../openapi/tags';
+import { validateMiddleware } from '../../../util/validation';
 
 // Implementation
 import { com } from '@earth-app/ocean';
@@ -19,7 +19,7 @@ const setUserActivities = new Hono<{ Bindings: Bindings }>();
 
 setUserActivities.patch(
 	'/',
-	zValidator('json', schemas.userActivitiesSet),
+	validateMiddleware('json', schemas.userActivitiesSet),
 	describeRoute({
 		summary: 'Set user activities',
 		description: 'Sets the activities associated with a user in the Earth App.',
@@ -53,8 +53,19 @@ setUserActivities.patch(
 	bearerAuthMiddleware(),
 	async (c) => {
 		const body = c.req.valid('json');
+		if (!Array.isArray(body)) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Invalid request body format. Expected an array of activity IDs.'
+				},
+				400
+			);
+		}
+
 		const activityIds = body
 			.filter(Boolean)
+			.filter((id) => typeof id === 'string')
 			.filter((id) => body.indexOf(id) === body.lastIndexOf(id)) // Ensure unique IDs
 			.map((id) => id.trim())
 			.filter((id) => id.length > 0);

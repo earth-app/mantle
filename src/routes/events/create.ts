@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
@@ -19,7 +19,7 @@ const createEvent = new Hono<{ Bindings: Bindings }>();
 createEvent.post(
 	'/',
 	authRateLimit(rateLimitConfigs.eventCreate),
-	zValidator('json', schemas.eventCreate),
+	validateMiddleware('json', schemas.eventCreate),
 	describeRoute({
 		summary: 'Create a new event',
 		description: 'Creates a new event within the Earth App',

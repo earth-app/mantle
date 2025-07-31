@@ -148,7 +148,7 @@ export const stringArray = z.array(z.string()).openapi({
 });
 
 export const idArray = z.array(id).openapi({
-	example: ['eb9137b1272938', 'audyrehwJd9wjfoz98enfoaw']
+	example: ['bu72behwJd9wjfoz98enfoaw', 'audyrehwJd9wjfoz98enfoaw']
 });
 
 // Objects
@@ -180,29 +180,33 @@ export const userUpdate = z
 
 export const userFieldPrivacy = z
 	.object({
-		account: visibility,
-		name: userPrivacy,
-		bio: userPrivacy,
-		email: userPrivacy,
-		address: userPrivacy,
-		activities: userPrivacy,
-		events: userPrivacy,
-		friends: userPrivacy,
-		last_login: userPrivacy,
-		account_type: userPrivacy
+		name: userPrivacy.optional().default('PUBLIC'),
+		bio: userPrivacy.optional().default('PUBLIC'),
+		phone_number: userPrivacy.optional().default('PRIVATE'),
+		country: userPrivacy.optional().default('PUBLIC'),
+		email: userPrivacy.optional().default('CIRCLE'),
+		address: userPrivacy.optional().default('PRIVATE'),
+		activities: userPrivacy.optional().default('MUTUAL'),
+		events: userPrivacy.optional().default('MUTUAL'),
+		friends: userPrivacy.optional().default('MUTUAL'),
+		last_login: userPrivacy.optional().default('CIRCLE'),
+		account_type: userPrivacy.optional().default('PUBLIC'),
+		circle: userPrivacy.optional().default('CIRCLE')
 	})
 	.openapi({
 		example: {
-			account: 'UNLISTED',
 			name: 'PUBLIC',
 			bio: 'PUBLIC',
+			phone_number: 'PRIVATE',
+			country: 'PUBLIC',
 			email: 'CIRCLE',
 			address: 'PRIVATE',
 			activities: 'PUBLIC',
 			events: 'PUBLIC',
 			friends: 'MUTUAL',
 			last_login: 'CIRCLE',
-			account_type: 'PUBLIC'
+			account_type: 'PUBLIC',
+			circle: 'CIRCLE'
 		}
 	});
 
@@ -367,12 +371,9 @@ export const activityUpdate = z
 		}
 	});
 
-export const userActivitiesSet = z
-	.array(z.string())
-	.min(1)
-	.openapi({
-		example: ['hiking', 'swimming', 'cycling']
-	});
+export const userActivitiesSet = z.array(z.string()).openapi({
+	example: ['hiking', 'swimming', 'cycling']
+});
 
 /// Return Objects
 
@@ -415,7 +416,6 @@ export const user = z
 				country: 'US',
 				phoneNumber: 1234567890,
 				visibility: {
-					account: 'UNLISTED',
 					name: 'PUBLIC',
 					bio: 'MUTUAL',
 					email: 'PRIVATE',

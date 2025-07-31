@@ -1,14 +1,15 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 import Bindings from '../../bindings';
+import { Activity } from '../../types/activities';
 import { adminMiddleware } from '../../util/authentication';
 import * as activities from '../../util/routes/activities';
 
@@ -75,7 +76,7 @@ activity.get(
 // Patch Activity
 activity.patch(
 	'/',
-	zValidator('json', schemas.activityUpdate),
+	validateMiddleware('json', schemas.activityUpdate),
 	describeRoute({
 		summary: 'Update an activity by ID [Admin Only]',
 		description: 'Updates the details of a specific activity in the Earth App. This route is restricted to admin users.',
@@ -136,7 +137,7 @@ activity.patch(
 			);
 		}
 
-		const data = c.req.valid('json');
+		const data: Partial<Activity> = c.req.valid('json');
 
 		const activity = await activities.getActivityById(id, c.env.DB);
 		if (!activity) {

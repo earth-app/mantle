@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 
-import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
+import { validateMiddleware } from '../../util/validation';
 
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
@@ -16,7 +16,7 @@ const createActivity = new Hono<{ Bindings: Bindings }>();
 
 createActivity.post(
 	'/',
-	zValidator('json', schemas.activityCreate),
+	validateMiddleware('json', schemas.activityCreate),
 	describeRoute({
 		summary: 'Create a new activity [Admin Only]',
 		description: 'Creates a new activity within the Earth App. Reserved for administrators.',
@@ -46,6 +46,16 @@ createActivity.post(
 	}),
 	async (c) => {
 		const { id, name, description, types, aliases } = c.req.valid('json');
+
+		if (!Array.isArray(types) || types.some((type) => typeof type !== 'string')) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Types must be an array of strings'
+				},
+				400
+			);
+		}
 
 		if (await activities.doesActivityExist(id, c.env.DB)) {
 			console.warn(`Activity with ID ${id} already exists`);

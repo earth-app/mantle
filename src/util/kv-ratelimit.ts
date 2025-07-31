@@ -216,5 +216,17 @@ export const rateLimitConfigs = {
 		requests: 1,
 		windowMs: 60 * 1000, // 1 minute
 		keyPrefix: 'rl:prompt:response:update'
+	},
+	// 1 every 3 minutes per user
+	articleCreate: {
+		requests: 1,
+		windowMs: 2 * 60 * 1000, // 3 minutes
+		keyPrefix: 'rl:article:create'
+	},
+	// 2 every 3 minutes per user
+	articleUpdate: {
+		requests: 2,
+		windowMs: 3 * 60 * 1000, // 3 minutes
+		keyPrefix: 'rl:article:update'
 	}
 } as const;
