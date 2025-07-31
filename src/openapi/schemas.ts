@@ -24,12 +24,29 @@ export const info = z.object({
 });
 
 export function paginated(schema: z.ZodTypeAny) {
-	return z.object({
-		page: z.number().int().min(1).openapi({ example: 1 }),
-		limit: z.number().int().min(1).max(100).openapi({ example: 25 }),
-		total: z.number().int().min(0).openapi({ example: 100 }),
-		items: z.array(schema)
-	});
+	return z
+		.object({
+			page: z.number().int().min(1).openapi({ example: 1, description: 'Current page number' }),
+			limit: z.number().int().min(1).max(100).openapi({ example: 25, description: 'Number of items per page' }),
+			total: z.number().int().min(0).openapi({ example: 100, description: 'Total number of items' }),
+			items: z.array(schema).openapi({ description: 'List of items on the current page' })
+		})
+		.openapi({
+			description: 'Paginated response',
+			example: {
+				page: 1,
+				limit: 25,
+				total: 100,
+				items: [
+					{
+						id: 'eb9137b1272938',
+						username: 'johndoe',
+						created_at: '2025-05-11T10:00:00Z',
+						updated_at: '2025-05-11T12:00:00Z'
+					}
+				]
+			}
+		});
 }
 
 export const paginatedParameters = [
@@ -47,12 +64,12 @@ export const paginatedParameters = [
 	{
 		name: 'limit',
 		in: 'query',
-		description: 'Number of items per page (default: 25, max: 100)',
+		description: 'Number of items per page (default: 25, max: 250)',
 		required: false,
 		schema: {
 			type: 'integer',
 			minimum: 1,
-			maximum: 100,
+			maximum: 250,
 			default: 25
 		}
 	},
@@ -68,6 +85,11 @@ export const paginatedParameters = [
 		}
 	}
 ] satisfies DescribeRouteOptions['parameters'];
+export const paginatedParams = z.object({
+	page: z.number().min(1).default(1),
+	limit: z.number().min(1).max(250).default(25),
+	search: z.string().max(40).default('')
+});
 
 // String Types
 export const text = z.string().openapi({ example: 'Hello World' });
@@ -76,6 +98,11 @@ export const username = z.string().min(4).max(20).openapi({ example: 'johndoe' }
 export const password = z.string().min(8).max(100).openapi({ example: 'password123' });
 export const email = z.string().email().openapi({ example: 'me@company.com' });
 export const date = z.string().datetime().openapi({ example: '2025-05-11T10:00:00Z' });
+export const hexCode = z
+	.string()
+	.length(7)
+	.regex(/^#[0-9A-Fa-f]{6}$/)
+	.openapi({ example: '#ffd700', description: 'A valid hex color code' });
 
 export const usernameParam = {
 	type: 'string',
@@ -266,20 +293,43 @@ export const promptResponseBody = z
 
 export const articleCreate = z
 	.object({
-		title: text.max(48),
-		summary: text.max(512),
-		tags: z.array(text.max(30)).max(10).default([]),
-		content: text.min(50).max(10000)
+		title: text.max(48).openapi({ example: 'Understanding Quantum Computing', description: 'The title of the article' }),
+		description: text.max(512).openapi({ description: 'A brief description of the article' }),
+		tags: z.array(text.max(30)).max(10).default([]).openapi({ description: 'Tags for the article, max 10 tags, each max 30 characters' }),
+		content: text.min(50).max(10000).openapi({ description: 'The main content of the article, min 50 characters, max 10000 characters' }),
+		color: hexCode.optional()
 	})
 	.openapi({
 		example: {
 			title: 'Understanding Quantum Computing',
-			summary: 'A deep dive into the principles of quantum computing and its potential applications.',
+			description: 'A deep dive into the principles of quantum computing and its potential applications.',
 			tags: ['quantum', 'computing', 'technology'],
 			content:
 				'Quantum computing is a type of computation that harnesses the principles of quantum mechanics. ' +
 				'It uses quantum bits, or qubits, which can exist in multiple states simultaneously, allowing for parallel processing of information. ' +
-				'This capability enables quantum computers to solve certain problems much faster than classical computers.'
+				'This capability enables quantum computers to solve certain problems much faster than classical computers.',
+			color: '#cf11ff'
+		}
+	});
+
+export const articleUpdate = z
+	.object({
+		title: text.max(48).optional(),
+		description: text.max(512).optional(),
+		tags: z.array(text.max(30)).max(10).default([]).optional(),
+		content: text.min(50).max(10000).optional(),
+		color: hexCode.optional()
+	})
+	.openapi({
+		example: {
+			title: 'Understanding Quantum Computing',
+			description: 'A deep dive into the principles of quantum computing and its potential applications.',
+			tags: ['quantum', 'computing', 'technology'],
+			content:
+				'Quantum computing is a type of computation that harnesses the principles of quantum mechanics. ' +
+				'It uses quantum bits, or qubits, which can exist in multiple states simultaneously, allowing for parallel processing of information. ' +
+				'This capability enables quantum computers to solve certain problems much faster than classical computers.',
+			color: '#cf11ff'
 		}
 	});
 
@@ -493,6 +543,67 @@ export const promptResponse = z
 		}
 	});
 export const promptResponses = z.array(promptResponse);
+
+export const article = z
+	.object({
+		id: id,
+		article_id: z.string().openapi({ example: 'article123' }),
+		title: text.max(48),
+		summary: text.max(512),
+		tags: z.array(text.max(30)).max(10).default([]),
+		content: text.min(50).max(10000),
+		created_at: date,
+		updated_at: date.optional(),
+		ocean: z
+			.object({
+				title: text,
+				url: z.string().url(),
+				author: text,
+				source: text,
+				links: z.record(z.string().url()).optional(),
+				abstract: text,
+				content: text,
+				theme_color: z.string().optional(),
+				keywords: z.array(text).optional(),
+				date: date,
+				favicon: z.string().url().optional()
+			})
+			.optional()
+	})
+	.openapi({
+		example: {
+			id: 'cbfjwIXdiqBwdn4dyd83g9cq',
+			article_id: 'article123',
+			title: 'Understanding Quantum Computing',
+			summary: 'A deep dive into the principles of quantum computing and its potential applications.',
+			tags: ['quantum', 'computing', 'technology'],
+			content:
+				'Quantum computing is a type of computation that harnesses the principles of quantum mechanics. ' +
+				'It uses quantum bits, or qubits, which can exist in multiple states simultaneously, allowing for parallel processing of information. ' +
+				'This capability enables quantum computers to solve certain problems much faster than classical computers.',
+			created_at: '2025-05-11T10:00:00Z',
+			updated_at: '2025-05-11T12:00:00Z',
+			ocean: {
+				title: 'Understanding Quantum Computing',
+				url: 'https://example.com/quantum-computing',
+				author: 'John Doe',
+				source: 'Tech Journal',
+				links: {
+					related: 'https://example.com/quantum-computing/related',
+					more_info: 'https://example.com/quantum-computing/more-info'
+				},
+				abstract: 'A brief overview of quantum computing principles.',
+				content:
+					'Quantum computing is a type of computation that harnesses the principles of quantum mechanics. ' +
+					'It uses quantum bits, or qubits, which can exist in multiple states simultaneously, allowing for parallel processing of information. ' +
+					'This capability enables quantum computers to solve certain problems much faster than classical computers.',
+				theme_color: '#ff11ff',
+				keywords: ['quantum', 'computing', 'technology'],
+				date: '5/11/2025',
+				favicon: 'https://example.com/quantum-computing/favicon.ico'
+			}
+		}
+	});
 
 // Response Schemas
 

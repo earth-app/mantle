@@ -5,6 +5,7 @@ import hello from './hello';
 import info from './info';
 
 import activities from './activities';
+import articles from './articles';
 import events from './events';
 import prompts from './prompts';
 import users from './users';
@@ -19,5 +20,6 @@ routes.route('/users', users);
 routes.route('/activities', activities);
 routes.route('/events', events);
 routes.route('/prompts', prompts);
+routes.route('/articles', articles);
 
 export default routes;
