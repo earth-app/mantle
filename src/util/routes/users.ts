@@ -13,6 +13,29 @@ import { DBError } from '../../types/errors';
 
 // Helpers
 
+const ADMIN_CREATION_DATE = new Date('2008-07-13T11:54:00Z');
+export const ADMIN_USER_OBJECT: UserObject = {
+	public: toUser(
+		com.earthapp.account.Account.ADMIN_ACCOUNT,
+		com.earthapp.account.Privacy.PRIVATE,
+		ADMIN_CREATION_DATE,
+		ADMIN_CREATION_DATE
+	),
+	account: com.earthapp.account.Account.ADMIN_ACCOUNT,
+	database: {
+		id: com.earthapp.account.Account.ADMIN_ACCOUNT.id,
+		username: com.earthapp.account.Account.ADMIN_ACCOUNT.username,
+		password: '',
+		salt: '',
+		binary: new Uint8Array(),
+		encryption_key: '',
+		encryption_iv: '',
+		last_login: ADMIN_CREATION_DATE,
+		created_at: ADMIN_CREATION_DATE,
+		updated_at: ADMIN_CREATION_DATE
+	}
+};
+
 export function createUser(username: string, callback: (user: com.earthapp.account.Account) => void) {
 	try {
 		const id = com.earthapp.account.Account.newId();
@@ -322,7 +345,7 @@ export async function getAuthenticatedUserFromContext(c: Context<{ Bindings: Bin
 	if (!path) {
 		if (token === c.env.ADMIN_API_KEY)
 			return {
-				data: null,
+				data: ADMIN_USER_OBJECT,
 				message: 'Admin API Key used, no user object attached',
 				status: 200
 			};

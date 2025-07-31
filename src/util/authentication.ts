@@ -8,7 +8,7 @@ import { HTTPException } from 'hono/http-exception';
 import { ContentfulStatusCode } from 'hono/utils/http-status';
 import Bindings from '../bindings';
 import * as encryption from './encryption';
-import { getUserById, getUserByUsername } from './routes/users';
+import { ADMIN_USER_OBJECT, getUserById, getUserByUsername } from './routes/users';
 import * as util from './util';
 
 type TokenRow = {
@@ -343,6 +343,9 @@ export async function getOwnerOfBearer(c: Context<{ Bindings: Bindings }>) {
 	if (!bearerToken || !bearerToken.startsWith('Bearer ')) return null;
 
 	const token = bearerToken.slice(7);
+	if (token.length !== com.earthapp.util.API_KEY_LENGTH) return null;
+	if (token === c.env.ADMIN_API_KEY) return ADMIN_USER_OBJECT;
+
 	const user = await getOwnerOfToken(token, c.env);
 
 	return user;
@@ -353,6 +356,10 @@ export async function getOwnerOfBearer(c: Context<{ Bindings: Bindings }>) {
 export function basicAuthMiddleware() {
 	return basicAuth({
 		verifyUser: async (username: string, password: string, c: Context) => {
+			if (!username || !password) return false;
+			if (username.length < 3 || username.length > 32) return false;
+			if (password.length < 8 || password.length > 64) return false;
+
 			const dbuser = await getUserByUsername(username, c.env);
 			if (!dbuser) return false;
 
