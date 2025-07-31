@@ -13,7 +13,7 @@ import { globalRateLimit } from './util/ratelimit';
 import { HTTPException } from 'hono/http-exception';
 import * as packageJson from '../package.json';
 import Bindings from './bindings';
-import { DBError } from './types/errors';
+import { DBError, ValidationError } from './types/errors';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -26,6 +26,16 @@ app.onError((err, c) => {
 				message: err.message
 			},
 			err.status
+		);
+	}
+
+	if (err instanceof ValidationError) {
+		return c.json(
+			{
+				code: 400,
+				message: `Validation Error: ${err.message}`
+			},
+			400
 		);
 	}
 
