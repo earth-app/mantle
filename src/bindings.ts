@@ -3,6 +3,7 @@ import { Ai, D1Database, Fetcher, KVNamespace, R2Bucket } from '@cloudflare/work
 type Bindings = {
 	DB: D1Database;
 	KV: KVNamespace;
+	CACHE: KVNamespace;
 	R2: R2Bucket;
 	AI: Ai;
 	ASSETS: Fetcher;

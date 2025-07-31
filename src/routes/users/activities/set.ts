@@ -93,7 +93,7 @@ setUserActivities.patch(
 
 		const user = res.data;
 
-		const activities = await Promise.all(activityIds.map(async (id) => await getActivityById(id, c.env.DB)));
+		const activities = await Promise.all(activityIds.map(async (id) => await getActivityById(id, c.env)));
 		if (activities.some((activity) => !activity)) {
 			return c.json(
 				{

@@ -27,6 +27,10 @@ database_id = "4c88abe1-6768-4f17-8cc6-8b8e41475a34"
 binding = "KV"
 id = "322faefd5628471cb7cea08cf041804a"
 
+[[kv_namespaces]]
+binding = "CACHE"
+id = "5210f267e03042ecb0e7175c4f985e2d"
+
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "earth-app"

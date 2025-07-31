@@ -44,7 +44,7 @@ events.get(
 
 		const { page, limit, search } = params;
 
-		const events = await getEvents(c.env.DB, limit, page - 1, search);
+		const events = await getEvents(c.env, limit, page - 1, search);
 		return c.json(
 			{
 				page: page,

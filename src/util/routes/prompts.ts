@@ -2,6 +2,7 @@ import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Prompt, PromptResponse } from '../../types/prompts';
+import { cache, clearCache, tryCache } from './cache';
 import { getUserById } from './users';
 
 // Helpers
@@ -164,7 +165,8 @@ export async function savePrompt(prompt: Prompt, d1: D1Database): Promise<Prompt
 	}
 }
 
-export async function updatePrompt(id: number, prompt: Prompt, d1: D1Database): Promise<Prompt> {
+export async function updatePrompt(id: number, prompt: Prompt, bindings: Bindings): Promise<Prompt> {
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	const updatedAt = new Date();
@@ -180,13 +182,19 @@ export async function updatePrompt(id: number, prompt: Prompt, d1: D1Database): 
 			throw new HTTPException(500, { message: `Failed to update prompt: ${result.error}` });
 		}
 
-		return { ...prompt, id };
+		const obj = { ...prompt, id };
+
+		const cacheKey = `prompt:${id}`;
+		cache(cacheKey, obj, bindings.CACHE);
+
+		return obj;
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to update prompt: ${error}` });
 	}
 }
 
-export async function deletePrompt(id: number, d1: D1Database): Promise<void> {
+export async function deletePrompt(id: number, bindings: Bindings): Promise<void> {
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	try {
@@ -199,6 +207,9 @@ export async function deletePrompt(id: number, d1: D1Database): Promise<void> {
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to delete prompt: ${result.error}` });
 		}
+
+		const cacheKey = `prompt:${id}`;
+		await clearCache(cacheKey, bindings.CACHE);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to delete prompt: ${error}` });
 	}
@@ -225,7 +236,8 @@ export async function savePromptResponse(prompt: Prompt, response: PromptRespons
 	}
 }
 
-export async function updatePromptResponse(id: number, response: PromptResponse, d1: D1Database): Promise<PromptResponse> {
+export async function updatePromptResponse(id: number, response: PromptResponse, bindings: Bindings): Promise<PromptResponse> {
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	const updatedAt = new Date();
@@ -241,13 +253,22 @@ export async function updatePromptResponse(id: number, response: PromptResponse,
 			throw new HTTPException(500, { message: `Failed to update prompt response: ${result.error}` });
 		}
 
-		return { ...response, id };
+		const obj = { ...response, id };
+
+		const cacheKey = `prompt_response:${id}`;
+		cache(cacheKey, obj, bindings.CACHE);
+
+		return obj;
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to update prompt response: ${error}` });
 	}
 }
 
-export async function deletePromptResponse(id: number, d1: D1Database): Promise<void> {
+export async function deletePromptResponse(id: number, bindings: Bindings): Promise<void> {
+	const cacheKey = `prompt_response:${id}`;
+	await clearCache(cacheKey, bindings.CACHE);
+
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	try {
@@ -267,20 +288,29 @@ export async function deletePromptResponse(id: number, d1: D1Database): Promise<
 
 // Prompt retrieval functions
 
-export async function getPrompts(d1: D1Database, limit: number = 25, page: number = 0, search: string = ''): Promise<Prompt[]> {
-	const query = `SELECT * FROM prompts${search ? `WHERE prompt LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
-	let results: Prompt[];
+export async function getPrompts(bindings: Bindings, limit: number = 25, page: number = 0, search: string = ''): Promise<Prompt[]> {
+	const cacheKey = `prompts:${limit}:${page}:${search.trim().toLowerCase()}`;
+	return tryCache(cacheKey, bindings.CACHE, async () => {
+		const d1 = bindings.DB;
+		const query = `SELECT * FROM prompts${search ? ` WHERE prompt LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
+		let results: Prompt[];
 
-	if (search) results = await findPrompt(query, d1, `%${search}%`, limit, page * limit);
-	else results = await findPrompt(query, d1, limit, page * limit);
+		if (search) results = await findPrompt(query, d1, `%${search}%`, limit, page * limit);
+		else results = await findPrompt(query, d1, limit, page * limit);
 
-	return results;
+		return results;
+	});
 }
 
-export async function getPromptById(id: number, d1: D1Database): Promise<Prompt | null> {
-	const query = `SELECT * FROM prompts WHERE id = ?`;
-	const prompts = await findPrompt(query, d1, id);
-	return prompts.length > 0 ? prompts[0] : null;
+export async function getPromptById(id: number, bindings: Bindings): Promise<Prompt | null> {
+	const cacheKey = `prompt:${id}`;
+
+	return tryCache(cacheKey, bindings.CACHE, async () => {
+		const d1 = bindings.DB;
+		const query = `SELECT * FROM prompts WHERE id = ?`;
+		const prompts = await findPrompt(query, d1, id);
+		return prompts.length > 0 ? prompts[0] : null;
+	});
 }
 
 // Prompt response retrieval functions

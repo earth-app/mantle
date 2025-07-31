@@ -57,7 +57,7 @@ currentEvent.get(
 			);
 		}
 
-		const events = await getEventsByAttendees([user.account.id], c.env.DB, limit, page - 1, search);
+		const events = await getEventsByAttendees([user.account.id], c.env, limit, page - 1, search);
 		return c.json(
 			{
 				page: page,
@@ -136,7 +136,7 @@ currentEvent.post(
 			);
 		}
 
-		const obj = await getEventById(eventId, c.env.DB);
+		const obj = await getEventById(eventId, c.env);
 		if (!obj) {
 			return c.json(
 				{
@@ -171,7 +171,7 @@ currentEvent.post(
 
 		event.addAttendee(user.account);
 
-		const updatedEvent = await updateEvent(obj, c.env.DB);
+		const updatedEvent = await updateEvent(obj, c.env);
 		return c.json(updatedEvent.public, 200);
 	}
 );
@@ -238,7 +238,7 @@ currentEvent.post(
 			);
 		}
 
-		const obj = await getEventById(eventId, c.env.DB);
+		const obj = await getEventById(eventId, c.env);
 		if (!obj) {
 			return c.json(
 				{
@@ -271,7 +271,7 @@ currentEvent.post(
 		}
 
 		event.removeAttendee(user.account);
-		const updatedEvent = await updateEvent(obj, c.env.DB);
+		const updatedEvent = await updateEvent(obj, c.env);
 
 		return c.json(updatedEvent.public, 200);
 	}

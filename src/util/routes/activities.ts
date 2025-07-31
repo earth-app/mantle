@@ -1,8 +1,10 @@
 import * as ocean from '@earth-app/ocean';
 import { com, kotlin } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
+import Bindings from '../../bindings';
 import { Activity, ActivityObject, toActivity } from '../../types/activities';
 import { DBError } from '../../types/errors';
+import { cache, checkCacheExists, clearCache, tryCache } from './cache';
 
 // Helpers
 
@@ -96,7 +98,8 @@ export async function saveActivity(activity: com.earthapp.activity.Activity, d1:
 	return newActivity;
 }
 
-export async function updateActivity(obj: ActivityObject, d1: D1Database): Promise<ActivityObject> {
+export async function updateActivity(obj: ActivityObject, bindings: Bindings): Promise<ActivityObject> {
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	const query = `UPDATE activities SET binary = ?, updated_at = ? WHERE id = ? LIMIT 1`;
@@ -112,10 +115,18 @@ export async function updateActivity(obj: ActivityObject, d1: D1Database): Promi
 		created_at: obj.database.created_at,
 		updated_at: updatedAt
 	});
+
+	const cacheKey = `activity:${obj.activity.id.trim().toLowerCase()}`;
+	cache(cacheKey, updatedActivity, bindings.CACHE);
+
 	return updatedActivity;
 }
 
-export async function deleteActivity(id: string, d1: D1Database): Promise<boolean> {
+export async function deleteActivity(id: string, bindings: Bindings): Promise<boolean> {
+	const cacheKey = `activity:${id.trim().toLowerCase()}`;
+	await clearCache(cacheKey, bindings.CACHE);
+
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	const query = `DELETE FROM activities WHERE id = ? LIMIT 1`;
@@ -126,40 +137,82 @@ export async function deleteActivity(id: string, d1: D1Database): Promise<boolea
 
 // Activity retrieval functions
 
-export async function getActivities(d1: D1Database, limit: number = 25, page: number = 0, search: string = ''): Promise<ActivityObject[]> {
-	await checkTableExists(d1);
+export async function getActivities(
+	bindings: Bindings,
+	limit: number = 25,
+	page: number = 0,
+	search: string = ''
+): Promise<ActivityObject[]> {
+	const cacheKey = `activities:${limit}:${page}:${search.trim().toLowerCase()}`;
 
-	const query = `SELECT * FROM activities${search ? ` WHERE id LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-	let results: ActivityObject[];
+	return tryCache(cacheKey, bindings.CACHE, async () => {
+		const d1 = bindings.DB;
+		await checkTableExists(d1);
 
-	if (search) results = await findActivity(query, d1, `%${search}%`, limit, page * limit);
-	else results = await findActivity(query, d1, limit, page * limit);
+		const query = `SELECT * FROM activities${search ? ` WHERE id LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+		let results: ActivityObject[];
 
-	return results;
+		if (search) results = await findActivity(query, d1, `%${search}%`, limit, page * limit);
+		else results = await findActivity(query, d1, limit, page * limit);
+
+		return results;
+	});
 }
 
-export async function doesActivityExist(id: string, d1: D1Database): Promise<boolean> {
+export async function doesActivityExist(id: string, bindings: Bindings): Promise<boolean> {
+	if (await checkCacheExists(`activity:${id.trim().toLowerCase()}`, bindings.CACHE)) return true;
+
+	const d1 = bindings.DB;
 	await checkTableExists(d1);
 
 	const query = `SELECT COUNT(*) as count FROM activities WHERE id = ?`;
 	const result = await d1.prepare(query).bind(id).first<{ count: number }>();
 	if (!result) return false;
+
 	return result.count > 0;
 }
 
-export async function getActivityById(id: string, d1: D1Database): Promise<ActivityObject | null> {
-	await checkTableExists(d1);
+export async function getActivityById(id: string, bindings: Bindings): Promise<ActivityObject | null> {
+	const cacheKey = `activity:${id.trim().toLowerCase()}`;
 
-	const query = `SELECT * FROM activities WHERE id = ? LIMIT 1`;
-	const result = await d1.prepare(query).bind(id).first<DBActivity>();
+	return tryCache(cacheKey, bindings.CACHE, async () => {
+		const d1 = bindings.DB;
+		await checkTableExists(d1);
 
-	if (!result) return null;
+		const query = `SELECT * FROM activities WHERE id = ? LIMIT 1`;
+		const result = await d1.prepare(query).bind(id).first<DBActivity>();
 
-	return toActivityObject({
-		id: result.id,
-		binary: new Uint8Array(result.binary),
-		created_at: result.created_at ? new Date(result.created_at) : undefined,
-		updated_at: result.updated_at ? new Date(result.updated_at) : undefined
+		if (!result) return null;
+
+		return toActivityObject({
+			id: result.id,
+			binary: new Uint8Array(result.binary),
+			created_at: result.created_at ? new Date(result.created_at) : undefined,
+			updated_at: result.updated_at ? new Date(result.updated_at) : undefined
+		});
+	});
+}
+
+export async function getActivityByAlias(alias: string, bindings: Bindings): Promise<ActivityObject | null> {
+	const alias0 = alias.trim().toLowerCase();
+	const cacheKey = `activity:${alias0}`;
+
+	return tryCache(cacheKey, bindings.CACHE, async () => {
+		// Loop through activities until we find an alias match
+		let activities = await getActivities(bindings, 100);
+		let page = 0;
+		while (activities.length > 0) {
+			for (const activity of activities) {
+				if (activity.activity.doesMatch(alias0)) {
+					return activity;
+				}
+			}
+
+			page++;
+			activities = await getActivities(bindings, 100, page);
+		}
+
+		return null; // No activity found with the given ID or alias
 	});
 }
 
@@ -168,11 +221,9 @@ export async function getActivityById(id: string, d1: D1Database): Promise<Activ
 export async function patchActivity(
 	activity: com.earthapp.activity.Activity,
 	data: Partial<Activity>,
-	d1: D1Database
+	bindings: Bindings
 ): Promise<ActivityObject | null> {
-	await checkTableExists(d1);
-
-	const activityObject = await getActivityById(activity.id, d1);
+	const activityObject = await getActivityById(activity.id, bindings);
 	if (!activityObject) {
 		console.error(`Activity with ID ${activity.id} not found`);
 		throw new HTTPException(404, { message: `Activity with ID ${activity.id} not found` });
@@ -200,5 +251,5 @@ export async function patchActivity(
 	}
 
 	activityObject.activity = newActivity;
-	return await updateActivity(activityObject, d1);
+	return await updateActivity(activityObject, bindings);
 }

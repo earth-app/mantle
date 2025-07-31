@@ -57,7 +57,7 @@ createActivity.post(
 			);
 		}
 
-		if (await activities.doesActivityExist(id, c.env.DB)) {
+		if (await activities.doesActivityExist(id, c.env)) {
 			console.warn(`Activity with ID ${id} already exists`);
 			return c.json(
 				{

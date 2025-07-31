@@ -72,7 +72,7 @@ prompt.get(
 			);
 		}
 
-		const prompt = await prompts.getPromptById(promptId, c.env.DB);
+		const prompt = await prompts.getPromptById(promptId, c.env);
 		if (!prompt) {
 			return c.json(
 				{
@@ -166,7 +166,7 @@ prompt.patch(
 			);
 		}
 
-		const existingPrompt = await prompts.getPromptById(promptId, c.env.DB);
+		const existingPrompt = await prompts.getPromptById(promptId, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
@@ -194,7 +194,7 @@ prompt.patch(
 				prompt,
 				visibility: visibility as 'PRIVATE' | 'CIRCLE' | 'MUTUAL' | 'PUBLIC'
 			},
-			c.env.DB
+			c.env
 		);
 		return c.json(updatedPrompt, 200);
 	}
@@ -263,7 +263,7 @@ prompt.delete(
 			);
 		}
 
-		const existingPrompt = await prompts.getPromptById(promptId, c.env.DB);
+		const existingPrompt = await prompts.getPromptById(promptId, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
@@ -284,7 +284,7 @@ prompt.delete(
 			);
 		}
 
-		await prompts.deletePrompt(promptId, c.env.DB);
+		await prompts.deletePrompt(promptId, c.env);
 		return c.body(null, 204);
 	}
 );
@@ -423,7 +423,7 @@ prompt.post(
 
 		const { content } = c.req.valid('json');
 
-		const existingPrompt = await prompts.getPromptById(id, c.env.DB);
+		const existingPrompt = await prompts.getPromptById(id, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
@@ -523,7 +523,7 @@ prompt.get(
 			);
 		}
 
-		const existingPrompt = await prompts.getPromptById(id, c.env.DB);
+		const existingPrompt = await prompts.getPromptById(id, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
@@ -645,7 +645,7 @@ prompt.patch(
 			);
 		}
 
-		const existingPrompt = await prompts.getPromptById(promptId, c.env.DB);
+		const existingPrompt = await prompts.getPromptById(promptId, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
@@ -677,7 +677,7 @@ prompt.patch(
 			);
 		}
 
-		await prompts.updatePromptResponse(responseId, { ...existingResponse, response }, c.env.DB);
+		await prompts.updatePromptResponse(responseId, { ...existingResponse, response }, c.env);
 		return c.json(
 			{
 				code: 200,
@@ -778,7 +778,7 @@ prompt.delete(
 			);
 		}
 
-		await prompts.deletePromptResponse(responseId, c.env.DB);
+		await prompts.deletePromptResponse(responseId, c.env);
 		return c.body(null, 204);
 	}
 );
