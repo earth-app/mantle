@@ -82,7 +82,7 @@ event.get(
 
 		const owner = await getOwnerOfBearer(c);
 		const isAllowed =
-			(owner && event.database.hostId == owner.database.id) || event.event.attendees.asJsArrayView().includes(owner?.database.id ?? '');
+			(owner && event.event.hostId == owner.account.id) || event.event.attendees.asJsArrayView().includes(owner?.account.id ?? '');
 
 		if (isAllowed) return c.json(event.public, 200);
 

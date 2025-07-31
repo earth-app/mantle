@@ -1,6 +1,6 @@
-import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 
+import { zValidator } from '@hono/zod-validator';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
