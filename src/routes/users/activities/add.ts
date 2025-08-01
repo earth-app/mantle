@@ -71,7 +71,7 @@ addUserActivity.put(
 			);
 		}
 
-		const activity = await getActivityById(activityId, c.env.DB);
+		const activity = await getActivityById(activityId, c.env);
 		if (!activity) {
 			return c.json(
 				{

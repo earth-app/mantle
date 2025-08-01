@@ -6,7 +6,8 @@ import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
-import { cache, checkCacheExists, clearCache, tryCache } from './cache';
+import { DBError, ValidationError } from '../../types/errors';
+import * as cache from './cache';
 
 // Helpers
 
@@ -38,13 +39,20 @@ export type DBEvent = {
 	updated_at?: Date;
 };
 
-function toEventObject(event: DBEvent): EventObject {
-	const eventClass = ocean.fromBinary(new Int8Array(event.binary)) as com.earthapp.event.Event;
-	return {
-		public: toEvent(eventClass, event.created_at, event.updated_at),
-		database: event,
-		event: eventClass
-	};
+function toEventObject(event: DBEvent | null): EventObject | null {
+	if (!event) return null;
+
+	try {
+		const eventClass = ocean.fromBinary(new Int8Array(event.binary)) as com.earthapp.event.Event;
+		return {
+			public: toEvent(eventClass, event.created_at, event.updated_at),
+			database: event,
+			event: eventClass
+		};
+	} catch (error) {
+		console.error(`Failed to convert DBEvent to EventObject: ${error}`);
+		throw new DBError(`Failed to convert DBEvent to EventObject: ${error}`);
+	}
 }
 
 export async function checkTableExists(d1: D1Database) {
@@ -74,7 +82,7 @@ export async function checkTableExists(d1: D1Database) {
 	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_events_date ON events(date)`).run();
 }
 
-async function findEvent(query: string, d1: D1Database, ...params: any[]): Promise<EventObject[]> {
+async function findEvent(query: string, d1: D1Database, ...params: any[]): Promise<DBEvent[]> {
 	await checkTableExists(d1);
 
 	const row = await d1
@@ -85,7 +93,7 @@ async function findEvent(query: string, d1: D1Database, ...params: any[]): Promi
 	if (!row || !row.success) throw new Error(`No events found for query: ${query} with params: '${params.join(', ')}'`);
 
 	return row.results.map((result) => {
-		const event: DBEvent = {
+		return {
 			id: result.id as string,
 			binary: result.binary as Uint8Array,
 			hostId: result.hostId as string,
@@ -95,8 +103,6 @@ async function findEvent(query: string, d1: D1Database, ...params: any[]): Promi
 			longitude: result.longitude as number | undefined,
 			date: new Date(result.date as number)
 		};
-
-		return toEventObject(event);
 	});
 }
 
@@ -132,6 +138,10 @@ export async function saveEvent(event: com.earthapp.event.Event, d1: D1Database)
 		created_at: new Date(),
 		updated_at: new Date()
 	});
+	if (!newEvent) {
+		throw new DBError(`Failed to convert event to EventObject after saving: ${event.id}`);
+	}
+
 	return newEvent;
 }
 
@@ -179,9 +189,12 @@ export async function updateEvent(obj: EventObject, bindings: Bindings): Promise
 		created_at: obj.database.created_at,
 		updated_at: updatedAt
 	});
+	if (!updatedEvent) {
+		throw new DBError(`Failed to convert updated event to EventObject: ${obj.event.id}`);
+	}
 
 	const cacheKey = `event:${obj.event.id}`;
-	cache(cacheKey, updatedEvent, bindings.CACHE);
+	cache.cache(cacheKey, updatedEvent.database, bindings.KV_CACHE);
 
 	return updatedEvent;
 }
@@ -193,7 +206,7 @@ export async function deleteEvent(id: string, bindings: Bindings): Promise<boole
 	const result = await d1.prepare('DELETE FROM events WHERE id = ?').bind(id).run();
 
 	const cacheKey = `event:${id}`;
-	await clearCache(cacheKey, bindings.CACHE);
+	await cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 	return result.success;
 }
@@ -203,18 +216,22 @@ export async function deleteEvent(id: string, bindings: Bindings): Promise<boole
 export async function getEvents(bindings: Bindings, limit: number = 25, page: number = 0, search: string = ''): Promise<EventObject[]> {
 	const cacheKey = `events:${limit}:${page}:${search}`;
 
-	return tryCache(cacheKey, bindings.CACHE, async () => {
-		const d1 = bindings.DB;
-		await checkTableExists(d1);
+	return (
+		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+			const d1 = bindings.DB;
+			await checkTableExists(d1);
 
-		const query = `SELECT * FROM events${search ? `WHERE name LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
-		let results: EventObject[];
+			const query = `SELECT * FROM events${search ? `WHERE name LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
+			let results: DBEvent[];
 
-		if (search) results = await findEvent(query, d1, `%${search}%`, limit, page * limit);
-		else results = await findEvent(query, d1, limit, page * limit);
+			if (search) results = await findEvent(query, d1, `%${search}%`, limit, page * limit);
+			else results = await findEvent(query, d1, limit, page * limit);
 
-		return results;
-	});
+			return results;
+		})
+	)
+		.map((event) => toEventObject(event))
+		.filter((event) => event !== null);
 }
 
 export async function getEventsInside(
@@ -227,45 +244,49 @@ export async function getEventsInside(
 ): Promise<EventObject[]> {
 	const cacheKey = `events:inside:${latitude}:${longitude}:${radius}:${limit}:${page}`;
 
-	return tryCache(cacheKey, bindings.CACHE, async () => {
-		const d1 = bindings.DB;
-		await checkTableExists(d1);
+	return (
+		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+			const d1 = bindings.DB;
+			await checkTableExists(d1);
 
-		const latRange = radius / 111.32; // roughly 1 degree latitude = 111.32 km
-		const lonRange = radius / (111.32 * Math.cos((latitude * Math.PI) / 180));
+			const latRange = radius / 111.32; // roughly 1 degree latitude = 111.32 km
+			const lonRange = radius / (111.32 * Math.cos((latitude * Math.PI) / 180));
 
-		const boundingBoxQuery = `SELECT * FROM events WHERE
+			const boundingBoxQuery = `SELECT * FROM events WHERE
         latitude IS NOT NULL AND longitude IS NOT NULL AND
         latitude BETWEEN ? AND ? AND
         longitude BETWEEN ? AND ? LIMIT ? OFFSET ?`;
 
-		const candidateResults = await findEvent(
-			boundingBoxQuery,
-			d1,
-			latitude - latRange,
-			latitude + latRange,
-			longitude - lonRange,
-			longitude + lonRange,
-			limit,
-			page * limit
-		);
+			const candidateResults = await findEvent(
+				boundingBoxQuery,
+				d1,
+				latitude - latRange,
+				latitude + latRange,
+				longitude - lonRange,
+				longitude + lonRange,
+				limit,
+				page * limit
+			);
 
-		if (candidateResults.length === 0) return [];
+			if (candidateResults.length === 0) return [];
 
-		const filteredResults = candidateResults.filter((event) => {
-			const { latitude: eventLat, longitude: eventLon } = event.database;
-			if (eventLat == null || eventLon == null) return false;
+			const filteredResults = candidateResults.filter((event) => {
+				const { latitude: eventLat, longitude: eventLon } = event;
+				if (eventLat == null || eventLon == null) return false;
 
-			const distance = haversineDistance(latitude, longitude, eventLat, eventLon);
-			return distance <= radius;
-		});
+				const distance = haversineDistance(latitude, longitude, eventLat, eventLon);
+				return distance <= radius;
+			});
 
-		return filteredResults;
-	});
+			return filteredResults;
+		})
+	)
+		.map((event) => toEventObject(event))
+		.filter((event) => event !== null);
 }
 
 export async function doesEventExist(id: string, bindings: Bindings): Promise<boolean> {
-	if (await checkCacheExists(`event:${id}`, bindings.CACHE)) return true;
+	if (await cache.checkCacheExists(`event:${id}`, bindings.KV_CACHE)) return true;
 
 	const d1 = bindings.DB;
 	await checkTableExists(d1);
@@ -277,23 +298,29 @@ export async function doesEventExist(id: string, bindings: Bindings): Promise<bo
 export async function getEventById(id: string, bindings: Bindings): Promise<EventObject | null> {
 	const cacheKey = `event:${id}`;
 
-	return tryCache(cacheKey, bindings.CACHE, async () => {
-		const d1 = bindings.DB;
-		const results = await findEvent('SELECT * FROM events WHERE id = ? LIMIT 1', d1, id);
-		if (results.length === 0) return null;
+	return toEventObject(
+		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+			const d1 = bindings.DB;
+			const results = await findEvent('SELECT * FROM events WHERE id = ? LIMIT 1', d1, id);
+			if (results.length === 0) return null;
 
-		return results[0];
-	});
+			return results[0];
+		})
+	);
 }
 
 export async function getEventsByHostId(hostId: string, bindings: Bindings, limit: number = 25, page: number = 0): Promise<EventObject[]> {
 	const cacheKey = `events:host:${hostId}:${limit}:${page}`;
-	return tryCache(cacheKey, bindings.CACHE, async () => {
-		const d1 = bindings.DB;
-		const query = 'SELECT * FROM events WHERE hostId = ? LIMIT ? OFFSET ?';
+	return (
+		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+			const d1 = bindings.DB;
+			const query = 'SELECT * FROM events WHERE hostId = ? LIMIT ? OFFSET ?';
 
-		return await findEvent(query, d1, hostId, limit, page * limit);
-	});
+			return await findEvent(query, d1, hostId, limit, page * limit);
+		})
+	)
+		.map((event) => toEventObject(event))
+		.filter((event) => event !== null);
 }
 
 export async function getEventsByAttendees(
@@ -308,34 +335,37 @@ export async function getEventsByAttendees(
 	}
 
 	const cacheKey = `events:attendees:${attendees.join(',')}:${limit}:${page}:${search}`;
-	return tryCache(cacheKey, bindings.CACHE, async () => {
-		const d1 = bindings.DB;
-		await checkTableExists(d1);
+	return (
+		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+			const d1 = bindings.DB;
+			await checkTableExists(d1);
 
-		const query = `SELECT * FROM events WHERE attendees IS NOT NULL ${
-			search ? `WHERE name LIKE ? ` : ''
-		}AND JSON_EXTRACT(attendees, ?) IS NOT NULL LIMIT ? OFFSET ?`;
-		let results: EventObject[];
-		if (search) results = await findEvent(query, d1, `%${search}%`, `$.${attendees.join(',$.')}`, limit, page * limit);
-		else results = await findEvent(query, d1, `$.${attendees.join(',$.')}`, limit, page * limit);
-		if (results.length === 0) return [];
+			const query = `SELECT * FROM events WHERE attendees IS NOT NULL ${
+				search ? `WHERE name LIKE ? ` : ''
+			}AND JSON_EXTRACT(attendees, ?) IS NOT NULL LIMIT ? OFFSET ?`;
+			let results: DBEvent[];
+			if (search) results = await findEvent(query, d1, `%${search}%`, `$.${attendees.join(',$.')}`, limit, page * limit);
+			else results = await findEvent(query, d1, `$.${attendees.join(',$.')}`, limit, page * limit);
+			if (results.length === 0) return [];
 
-		// Verify attendees against the event's attendees
-		// This is necessary because JSON_EXTRACT can return events with empty or mismatched attendees
-		return results.filter((event) => {
-			const eventAttendees = event.database.attendees || [];
-			return attendees.some((attendee) => eventAttendees.includes(attendee) || event.database.hostId === attendee);
-		});
-	});
+			// Verify attendees against the event's attendees
+			// This is necessary because JSON_EXTRACT can return events with empty or mismatched attendees
+			return results.filter((event) => {
+				const eventAttendees = event.attendees || [];
+				return attendees.some((attendee) => eventAttendees.includes(attendee) || event.hostId === attendee);
+			});
+		})
+	)
+		.map((event) => toEventObject(event))
+		.filter((event) => event !== null);
 }
 
 // Event update functions
 
-export async function patchEvent(event: com.earthapp.event.Event, data: Partial<Event>, bindings: Bindings) {
-	const eventObject = await getEventById(event.id, bindings);
-	if (!eventObject) {
-		console.error(`Event with ID ${event.id} not found`);
-		throw new HTTPException(404, { message: `Event with ID ${event.id} not found` });
+export async function patchEvent(eventObject: EventObject, data: Partial<Event>, bindings: Bindings) {
+	const event = eventObject.event;
+	if (!event) {
+		throw new ValidationError(`Event with ID ${eventObject.public.id} not found`);
 	}
 
 	let newEvent = event.deepCopy() as com.earthapp.event.Event;

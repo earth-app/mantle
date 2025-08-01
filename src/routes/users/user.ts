@@ -76,7 +76,7 @@ user.patch(
 		const user = res.data;
 
 		// Update user properties
-		const returned = await users.patchUser(user.account, c.env, data);
+		const returned = await users.patchUser(user, c.env, data);
 		return c.json(returned, 200);
 	}
 );
@@ -176,7 +176,7 @@ user.patch(
 			);
 		}
 
-		const updated = await users.patchUser(user.account, c.env);
+		const updated = await users.patchUser(user, c.env);
 		return c.json(updated, 200);
 	}
 );

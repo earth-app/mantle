@@ -28,7 +28,7 @@ binding = "KV"
 id = "322faefd5628471cb7cea08cf041804a"
 
 [[kv_namespaces]]
-binding = "CACHE"
+binding = "KV_CACHE"
 id = "5210f267e03042ecb0e7175c4f985e2d"
 
 [[r2_buckets]]

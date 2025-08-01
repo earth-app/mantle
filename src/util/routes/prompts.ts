@@ -185,7 +185,7 @@ export async function updatePrompt(id: number, prompt: Prompt, bindings: Binding
 		const obj = { ...prompt, id };
 
 		const cacheKey = `prompt:${id}`;
-		cache(cacheKey, obj, bindings.CACHE);
+		cache(cacheKey, obj, bindings.KV_CACHE);
 
 		return obj;
 	} catch (error) {
@@ -209,7 +209,7 @@ export async function deletePrompt(id: number, bindings: Bindings): Promise<void
 		}
 
 		const cacheKey = `prompt:${id}`;
-		await clearCache(cacheKey, bindings.CACHE);
+		await clearCache(cacheKey, bindings.KV_CACHE);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to delete prompt: ${error}` });
 	}
@@ -256,7 +256,7 @@ export async function updatePromptResponse(id: number, response: PromptResponse,
 		const obj = { ...response, id };
 
 		const cacheKey = `prompt_response:${id}`;
-		cache(cacheKey, obj, bindings.CACHE);
+		cache(cacheKey, obj, bindings.KV_CACHE);
 
 		return obj;
 	} catch (error) {
@@ -266,7 +266,7 @@ export async function updatePromptResponse(id: number, response: PromptResponse,
 
 export async function deletePromptResponse(id: number, bindings: Bindings): Promise<void> {
 	const cacheKey = `prompt_response:${id}`;
-	await clearCache(cacheKey, bindings.CACHE);
+	await clearCache(cacheKey, bindings.KV_CACHE);
 
 	const d1 = bindings.DB;
 	await checkTableExists(d1);
@@ -290,7 +290,7 @@ export async function deletePromptResponse(id: number, bindings: Bindings): Prom
 
 export async function getPrompts(bindings: Bindings, limit: number = 25, page: number = 0, search: string = ''): Promise<Prompt[]> {
 	const cacheKey = `prompts:${limit}:${page}:${search.trim().toLowerCase()}`;
-	return tryCache(cacheKey, bindings.CACHE, async () => {
+	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
 		const d1 = bindings.DB;
 		const query = `SELECT * FROM prompts${search ? ` WHERE prompt LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
 		let results: Prompt[];
@@ -305,7 +305,7 @@ export async function getPrompts(bindings: Bindings, limit: number = 25, page: n
 export async function getPromptById(id: number, bindings: Bindings): Promise<Prompt | null> {
 	const cacheKey = `prompt:${id}`;
 
-	return tryCache(cacheKey, bindings.CACHE, async () => {
+	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
 		const d1 = bindings.DB;
 		const query = `SELECT * FROM prompts WHERE id = ?`;
 		const prompts = await findPrompt(query, d1, id);

@@ -9,7 +9,7 @@ import * as util from '../util';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
-import { DBError } from '../../types/errors';
+import { DBError, ValidationError } from '../../types/errors';
 
 // Helpers
 
@@ -474,13 +474,10 @@ export async function getUserByEmail(email: string, bindings: Bindings) {
 
 // User update functions
 
-export async function patchUser(account: com.earthapp.account.Account, bindings: Bindings, data?: DeepPartial<User['account']>) {
-	await checkTableExists(bindings.DB);
-
-	const userObject = await getUserById(account.id, bindings, com.earthapp.account.Privacy.PRIVATE);
-	if (!userObject) {
-		console.error(`User with ID ${account.id} not found`);
-		throw new HTTPException(404, { message: 'User not found' });
+export async function patchUser(userObject: UserObject, bindings: Bindings, data?: DeepPartial<User['account']>) {
+	const account = userObject.account;
+	if (!account) {
+		throw new ValidationError(`User account not found for user ID ${userObject.public.id}`);
 	}
 
 	let newAccount: com.earthapp.account.Account;
