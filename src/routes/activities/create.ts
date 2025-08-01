@@ -10,6 +10,7 @@ import { validateMiddleware } from '../../util/validation';
 
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
+import { adminMiddleware } from '../../util/authentication';
 import * as activities from '../../util/routes/activities';
 
 const createActivity = new Hono<{ Bindings: Bindings }>();
@@ -44,6 +45,7 @@ createActivity.post(
 		},
 		tags: [tags.ACTIVITIES]
 	}),
+	adminMiddleware(),
 	async (c) => {
 		const { id, name, description, types, aliases } = c.req.valid('json');
 

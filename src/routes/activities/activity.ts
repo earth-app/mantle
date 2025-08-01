@@ -27,7 +27,23 @@ activity.get(
 				in: 'path',
 				description: 'ID of the activity to retrieve',
 				required: true,
-				schema: schemas.idParam
+				schema: {
+					type: 'string',
+					example: 'coding',
+					description: 'The unique identifier of the activity to update',
+					minLength: 3
+				}
+			},
+			{
+				name: 'includeAliases',
+				in: 'query',
+				description: 'Whether to search for aliases as well',
+				required: false,
+				schema: {
+					type: 'boolean',
+					default: false,
+					description: 'If true, will search for aliases in addition to the activity ID'
+				}
 			}
 		],
 		responses: {
@@ -47,7 +63,7 @@ activity.get(
 		tags: [tags.ACTIVITIES]
 	}),
 	async (c) => {
-		const id = c.req.param('activityId');
+		const id = c.req.param('activityId')?.trim().toLowerCase();
 		if (!id) {
 			return c.json(
 				{
@@ -58,7 +74,15 @@ activity.get(
 			);
 		}
 
-		const activity = await activities.getActivityById(id, c.env.DB);
+		const includeAliases = c.req.query('includeAliases')?.toLowerCase() === 'true';
+
+		let activity = await activities.getActivityById(id, c.env);
+		if (!activity) {
+			if (includeAliases) {
+				activity = await activities.getActivityByAlias(id, c.env);
+			}
+		}
+
 		if (!activity) {
 			return c.json(
 				{
@@ -139,7 +163,7 @@ activity.patch(
 
 		const data: Partial<Activity> = c.req.valid('json');
 
-		const activity = await activities.getActivityById(id, c.env.DB);
+		const activity = await activities.getActivityById(id, c.env);
 		if (!activity) {
 			return c.json(
 				{
@@ -151,12 +175,12 @@ activity.patch(
 		}
 
 		const updatedActivity = await activities.patchActivity(
-			activity.activity,
+			activity,
 			{
 				...data,
 				types: data.types?.map((type) => type as any)
 			},
-			c.env.DB
+			c.env
 		);
 		if (!updatedActivity) {
 			return c.json(
@@ -213,7 +237,7 @@ activity.delete(
 			);
 		}
 
-		const result = await activities.deleteActivity(id, c.env.DB);
+		const result = await activities.deleteActivity(id, c.env);
 		if (!result) {
 			return c.json(
 				{

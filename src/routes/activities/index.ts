@@ -11,7 +11,6 @@ import createActivity from './create';
 
 // Implementation
 import Bindings from '../../bindings';
-import { adminMiddleware } from '../../util/authentication';
 import { getActivities } from '../../util/routes/activities';
 import { paginatedParameters } from '../../util/util';
 
@@ -44,22 +43,20 @@ activities.get(
 
 		const { page, limit, search } = params;
 
-		const activites = await getActivities(c.env.DB, limit, page - 1, search);
+		const activities = await getActivities(c.env, limit, page - 1, search);
 		return c.json(
 			{
 				page: page,
 				limit: limit,
-				total: activites.length,
-				items: activites.map((activity) => activity.public)
+				total: activities.length,
+				items: activities.map((activity) => activity.public)
 			},
 			200
 		);
 	}
 );
 
-activities.use('/create', adminMiddleware());
 activities.route('/create', createActivity);
-
 activities.route('/:activityId', activity);
 
 export default activities;

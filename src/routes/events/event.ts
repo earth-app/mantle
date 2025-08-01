@@ -13,7 +13,7 @@ import { Event } from '../../types/events';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
 import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
-import { deleteEvent, getEventById, patchEvent } from '../../util/routes/events';
+import * as events from '../../util/routes/events';
 
 const event = new Hono<{ Bindings: Bindings }>();
 
@@ -65,7 +65,7 @@ event.get(
 			);
 		}
 
-		const event = await getEventById(id, c.env);
+		const event = await events.getEventById(id, c.env);
 		if (!event) {
 			return c.json(
 				{
@@ -180,7 +180,7 @@ event.patch(
 			data.hostId = undefined; // Prevent updating host ID
 		}
 
-		const event = await getEventById(id, c.env);
+		const event = await events.getEventById(id, c.env);
 		if (!event) {
 			return c.json(
 				{
@@ -213,7 +213,7 @@ event.patch(
 			);
 		}
 
-		const updatedEvent = await patchEvent(event.event, data, c.env);
+		const updatedEvent = await events.patchEvent(event, data, c.env);
 		return c.json(updatedEvent.public, 200);
 	}
 );
@@ -269,7 +269,7 @@ event.delete(
 			);
 		}
 
-		const event = await getEventById(id, c.env);
+		const event = await events.getEventById(id, c.env);
 		if (!event) {
 			return c.json(
 				{
@@ -301,7 +301,7 @@ event.delete(
 			);
 		}
 
-		const result = await deleteEvent(id, c.env);
+		const result = await events.deleteEvent(id, c.env);
 		if (!result) {
 			return c.json(
 				{

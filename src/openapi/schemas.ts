@@ -103,6 +103,7 @@ export const hexCode = z
 	.length(7)
 	.regex(/^#[0-9A-Fa-f]{6}$/)
 	.openapi({ example: '#ffd700', description: 'A valid hex color code' });
+export const bool = z.boolean().openapi({ example: true });
 
 export const usernameParam = {
 	type: 'string',
@@ -360,14 +361,19 @@ export const activityUpdate = z
 		name: text.optional(),
 		description: text.optional(),
 		types: z.array(activityType).optional(),
-		aliases: z.array(z.string()).optional()
+		aliases: z.array(z.string()).optional(),
+		fields: z.record(z.string()).optional()
 	})
 	.openapi({
 		example: {
 			name: 'Mountain Hiking',
 			description: 'A challenging outdoor activity in the mountains',
 			types: ['HOBBY', 'SPORT'],
-			aliases: ['mountaineering', 'trekking']
+			aliases: ['mountaineering', 'trekking'],
+			fields: {
+				difficulty: 'hard',
+				elevation: 'high'
+			}
 		}
 	});
 
@@ -492,7 +498,8 @@ export const activity = z
 			example: ['HOBBY', 'SPORT']
 		}),
 		created_at: date,
-		updated_at: date.optional()
+		updated_at: date.optional(),
+		fields: z.record(z.string())
 	})
 	.openapi({
 		example: {
@@ -501,7 +508,11 @@ export const activity = z
 			description: 'A fun outdoor activity',
 			types: ['HOBBY', 'SPORT'],
 			created_at: '2025-05-11T10:00:00Z',
-			updated_at: '2025-05-11T12:00:00Z'
+			updated_at: '2025-05-11T12:00:00Z',
+			fields: {
+				difficulty: 'hard',
+				elevation: 'high'
+			}
 		}
 	});
 export const activities = z.array(activity);

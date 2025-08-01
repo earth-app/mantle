@@ -32,6 +32,7 @@ export type Activity = {
 	types: (typeof com.earthapp.activity.ActivityType.prototype.name)[];
 	created_at?: Date;
 	updated_at?: Date;
+	fields: Record<string, string>;
 };
 
 /**
@@ -49,6 +50,7 @@ export function toActivity(data: com.earthapp.activity.Activity, created_at: Dat
 		description: data.description ?? undefined,
 		types: data.types.asJsArrayView().map((type) => type.name),
 		created_at: created_at,
-		updated_at: updated_at
+		updated_at: updated_at,
+		fields: Object.fromEntries(data.getAllFields().asJsReadonlyMapView().entries())
 	};
 }
