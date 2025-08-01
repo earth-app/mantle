@@ -151,8 +151,6 @@ export async function getActivities(
 	return (
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
 			const d1 = bindings.DB;
-			await checkTableExists(d1);
-
 			const query = `SELECT * FROM activities${search ? ` WHERE id LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
 			let results: DBActivity[];
 
@@ -164,6 +162,14 @@ export async function getActivities(
 	)
 		.map((activity) => toActivityObject(activity))
 		.filter((activity) => activity !== null);
+}
+
+export async function getRandomActivities(bindings: Bindings, limit: number = 25): Promise<ActivityObject[]> {
+	const d1 = bindings.DB;
+	const query = `SELECT * FROM activities ORDER BY RANDOM() LIMIT ?`;
+	const results = await findActivity(query, d1, limit);
+
+	return results.map((activity) => toActivityObject(activity)).filter((activity) => activity !== null);
 }
 
 export async function doesActivityExist(id: string, bindings: Bindings): Promise<boolean> {
