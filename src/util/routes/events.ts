@@ -234,6 +234,20 @@ export async function getEvents(bindings: Bindings, limit: number = 25, page: nu
 		.filter((event) => event !== null);
 }
 
+export async function getEventsCount(bindings: Bindings, search: string = ''): Promise<number> {
+	const d1 = bindings.DB;
+	await checkTableExists(d1);
+
+	const query = `SELECT COUNT(*) as count FROM events${search ? ' WHERE name LIKE ?' : ''}`;
+	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
+	const result = await d1
+		.prepare(query)
+		.bind(...params)
+		.first<{ count: number }>();
+
+	return result?.count ?? 0;
+}
+
 export async function getEventsInside(
 	bindings: Bindings,
 	latitude: number,

@@ -11,7 +11,7 @@ import prompt from './prompt';
 
 // Implementation
 import Bindings from '../../bindings';
-import { getPrompts } from '../../util/routes/prompts';
+import { getPrompts, getPromptsCount } from '../../util/routes/prompts';
 import { paginatedParameters } from '../../util/util';
 
 const prompts = new Hono<{ Bindings: Bindings }>();
@@ -43,8 +43,16 @@ prompts.get(
 
 		const { page, limit, search } = params;
 
-		const prompts = await getPrompts(c.env.DB, limit, page - 1, search);
-		return c.json(prompts);
+		const prompts = await getPrompts(c.env, limit, page - 1, search);
+		return c.json(
+			{
+				page: page,
+				limit: limit,
+				total: await getPromptsCount(c.env, search),
+				items: prompts
+			},
+			200
+		);
 	}
 );
 

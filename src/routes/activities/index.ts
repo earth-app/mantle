@@ -11,7 +11,7 @@ import createActivity from './create';
 
 // Implementation
 import Bindings from '../../bindings';
-import { getActivities } from '../../util/routes/activities';
+import { getActivities, getActivitiesCount } from '../../util/routes/activities';
 import { paginatedParameters } from '../../util/util';
 
 const activities = new Hono<{ Bindings: Bindings }>();
@@ -48,7 +48,7 @@ activities.get(
 			{
 				page: page,
 				limit: limit,
-				total: activities.length,
+				total: await getActivitiesCount(c.env, search),
 				items: activities.map((activity) => activity.public)
 			},
 			200

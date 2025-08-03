@@ -394,6 +394,37 @@ export async function getAuthenticatedUserFromContext(c: Context<{ Bindings: Bin
 
 // User retrieval functions
 
+export async function getUsers(
+	bindings: Bindings,
+	limit: number = 25,
+	page: number = 0,
+	search: string = '',
+	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
+): Promise<UserObject[]> {
+	await checkTableExists(bindings.DB);
+	const query = `SELECT * FROM users${search ? ` WHERE username LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+
+	const statement = bindings.DB.prepare(query);
+	let results: D1Result<DBUser>;
+	if (search) results = await statement.bind(`%${search}%`, limit, page * limit).all<DBUser>();
+	else results = await statement.bind(limit, page * limit).all<DBUser>();
+
+	if (!results || results.error) throw new DBError(`Failed to retrieve users: ${results.error}`);
+
+	return Promise.all(results.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
+}
+
+export async function getUsersCount(bindings: Bindings, search: string = ''): Promise<number> {
+	await checkTableExists(bindings.DB);
+	const query = `SELECT COUNT(*) as count FROM users${search ? ' WHERE username LIKE ?' : ''}`;
+	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
+	const result = await bindings.DB.prepare(query)
+		.bind(...params)
+		.first<{ count: number }>();
+
+	return result?.count ?? 0;
+}
+
 export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {
 	await checkTableExists(bindings.DB);
 	const query = `SELECT COUNT(*) as count FROM users WHERE username = ?`;
@@ -421,26 +452,6 @@ export async function getUserByUsername(
 	await checkTableExists(bindings.DB);
 	const results = await findUser('SELECT * FROM users WHERE username = ? LIMIT 1', fieldPrivacy, bindings, username);
 	return results.length ? results[0] : null;
-}
-
-export async function getUsers(
-	bindings: Bindings,
-	limit: number = 25,
-	page: number = 0,
-	search: string = '',
-	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
-): Promise<UserObject[]> {
-	await checkTableExists(bindings.DB);
-	const query = `SELECT * FROM users${search ? ` WHERE username LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-
-	const statement = bindings.DB.prepare(query);
-	let results: D1Result<DBUser>;
-	if (search) results = await statement.bind(`%${search}%`, limit, page * limit).all<DBUser>();
-	else results = await statement.bind(limit, page * limit).all<DBUser>();
-
-	if (!results || results.error) throw new DBError(`Failed to retrieve users: ${results.error}`);
-
-	return Promise.all(results.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
 
 export async function getAccountBy(

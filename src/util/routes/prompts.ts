@@ -302,6 +302,17 @@ export async function getPrompts(bindings: Bindings, limit: number = 25, page: n
 	});
 }
 
+export async function getPromptsCount(bindings: Bindings, search: string = ''): Promise<number> {
+	await checkTableExists(bindings.DB);
+	const query = `SELECT COUNT(*) as count FROM prompts${search ? ' WHERE prompt LIKE ?' : ''}`;
+	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
+	const result = await bindings.DB.prepare(query)
+		.bind(...params)
+		.first<{ count: number }>();
+
+	return result?.count ?? 0;
+}
+
 export async function getPromptById(id: number, bindings: Bindings): Promise<Prompt | null> {
 	const cacheKey = `prompt:${id}`;
 

@@ -12,7 +12,7 @@ import event from './event';
 
 // Implementation
 import Bindings from '../../bindings';
-import { getEvents } from '../../util/routes/events';
+import { getEvents, getEventsCount } from '../../util/routes/events';
 import { paginatedParameters } from '../../util/util';
 
 const events = new Hono<{ Bindings: Bindings }>();
@@ -49,7 +49,7 @@ events.get(
 			{
 				page: page,
 				limit: limit,
-				total: events.length,
+				total: await getEventsCount(c.env, search),
 				items: events.map((event) => event.public)
 			},
 			200

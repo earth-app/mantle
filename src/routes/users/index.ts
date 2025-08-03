@@ -15,7 +15,7 @@ import user from './user';
 // Implementation
 import Bindings from '../../bindings';
 import { bearerAuthMiddleware } from '../../util/authentication';
-import { getUsers } from '../../util/routes/users';
+import { getUsers, getUsersCount } from '../../util/routes/users';
 import { paginatedParameters } from '../../util/util';
 
 const users = new Hono<{ Bindings: Bindings }>();
@@ -52,7 +52,7 @@ users.get(
 			{
 				page: page,
 				limit: limit,
-				total: users.length,
+				total: await getUsersCount(c.env, search),
 				items: users
 			},
 			200

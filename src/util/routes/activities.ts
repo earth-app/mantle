@@ -140,6 +140,20 @@ export async function deleteActivity(id: string, bindings: Bindings): Promise<bo
 
 // Activity retrieval functions
 
+export async function getActivitiesCount(bindings: Bindings, search: string = ''): Promise<number> {
+	const d1 = bindings.DB;
+	await checkTableExists(d1);
+
+	const query = `SELECT COUNT(*) as count FROM activities${search ? ' WHERE id LIKE ?' : ''}`;
+	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
+	const result = await d1
+		.prepare(query)
+		.bind(...params)
+		.first<{ count: number }>();
+
+	return result?.count ?? 0;
+}
+
 export async function getActivities(
 	bindings: Bindings,
 	limit: number = 25,

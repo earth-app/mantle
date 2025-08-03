@@ -12,7 +12,7 @@ import createArticle from './create';
 
 // Implementation
 import Bindings from '../../bindings';
-import { getArticles } from '../../util/routes/articles';
+import { getArticles, getArticlesCount } from '../../util/routes/articles';
 
 const articles = new Hono<{ Bindings: Bindings }>();
 
@@ -45,7 +45,7 @@ articles.get(
 			{
 				page: page,
 				limit: limit,
-				total: articles.length,
+				total: await getArticlesCount(c.env.KV, search),
 				items: articles
 			},
 			200

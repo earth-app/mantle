@@ -81,6 +81,24 @@ export async function getArticles(kv: KVNamespace, page: number = 1, limit: numb
 	return await retrieveArticles(kv, keys);
 }
 
+export async function getArticlesCount(kv: KVNamespace, search: string = ''): Promise<number> {
+	const result = await kv.list<ArticleMetadata>({ prefix: 'article:' });
+
+	return result.keys.filter((key) => {
+		if (!search) return true;
+
+		const metadata = key.metadata;
+		if (!metadata) return false;
+
+		return (
+			metadata.title.toLowerCase().includes(search.toLowerCase()) ||
+			metadata.author.toLowerCase().includes(search.toLowerCase()) ||
+			metadata.tags.some((tag) => tag.toLowerCase().includes(search.toLowerCase())) ||
+			metadata.summary.includes(search)
+		);
+	}).length;
+}
+
 export async function getArticle(kv: KVNamespace, id: string): Promise<Article | null> {
 	const article = await kv.get<Article>(`article:${id}`, 'json');
 	return article || null;
