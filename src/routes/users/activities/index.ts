@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 
 // User Activities Routes
 import addUserActivity from './add';
+import recommendActivities from './recommend';
 import removeUserActivity from './remove';
 import setUserActivities from './set';
 
@@ -12,5 +13,6 @@ const userActivities = new Hono<{ Bindings: Bindings }>();
 userActivities.route('/add', addUserActivity);
 userActivities.route('/remove', removeUserActivity);
 userActivities.route('/set', setUserActivities);
+userActivities.route('/recommend', recommendActivities);
 
 export default userActivities;

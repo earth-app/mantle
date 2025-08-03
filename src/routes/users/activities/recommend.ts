@@ -46,7 +46,10 @@ recommendActivities.get(
 			},
 			400: schemas.badRequest,
 			401: schemas.unauthorized,
-			403: schemas.forbidden
+			403: schemas.forbidden,
+			404: {
+				description: 'No activities available for recommendations'
+			}
 		},
 		tags: [tags.USERS, tags.ACTIVITIES]
 	}),
@@ -99,12 +102,34 @@ recommendActivities.get(
 		);
 
 		const poolList = kotlin.collections.KtList.fromJsArray(Object.values(pool).map((activity) => activity.obj));
+		if (poolList.asJsReadonlyArrayView().length === 0) {
+			return c.json(
+				{
+					code: 404,
+					message: 'No activities available for recommendations.'
+				},
+				404
+			);
+		}
+
 		const recommendations = com.earthapp.ocean
 			.recommendActivityForAccount(poolList, user.account)
 			.asJsReadonlyArrayView()
 			.map((activity) => toActivity(activity, pool[activity.id]?.created_at, pool[activity.id]?.updated_at));
 
-		return c.json(recommendations, 200);
+		// Remove duplicate activities based on ID
+		const recommendations0 = recommendations.filter((activity, index, arr) => arr.findIndex((a) => a.id === activity.id) === index);
+		if (recommendations0.length === 0) {
+			return c.json(
+				{
+					code: 404,
+					message: 'No unique activities available for recommendations.'
+				},
+				404
+			);
+		}
+
+		return c.json(recommendations0, 200);
 	}
 );
 
