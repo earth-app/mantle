@@ -74,7 +74,7 @@ createPrompt.post(
 			);
 		}
 
-		newPrompt = await prompts.savePrompt(newPrompt, c.env.DB);
+		newPrompt = await prompts.savePrompt(newPrompt, c.env);
 		return c.json(newPrompt, 201);
 	}
 );

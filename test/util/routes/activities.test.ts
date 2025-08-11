@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ActivityObject } from '../../../src/types/activities';
 import { setupAllTables } from '../../table-setup';
 
 describe('Activities Utility Functions', () => {
@@ -22,7 +23,7 @@ describe('Activities Utility Functions', () => {
 			expect(typeof activities.getActivities).toBe('function');
 			expect(typeof activities.doesActivityExist).toBe('function');
 			expect(typeof activities.patchActivity).toBe('function');
-			expect(typeof activities.checkTableExists).toBe('function');
+			expect(typeof activities.init).toBe('function');
 		});
 
 		it('should handle createActivity function', async () => {
@@ -45,7 +46,7 @@ describe('Activities Utility Functions', () => {
 		});
 
 		it('should handle checkTableExists function', async () => {
-			const { checkTableExists } = await import('../../../src/util/routes/activities');
+			const { init: checkTableExists } = await import('../../../src/util/routes/activities');
 
 			const mockDB = (globalThis as any).mockBindings?.DB;
 			if (mockDB) {
@@ -174,7 +175,11 @@ describe('Activities Utility Functions', () => {
 						a.description = 'Original description';
 					});
 
-					const result = await patchActivity(activity, { name: 'Updated Activity' }, mockDB);
+					const result = await patchActivity(
+						{ activity, database: null, public: null } as unknown as ActivityObject,
+						{ name: 'Updated Activity' },
+						mockDB
+					);
 					expect(result).toBeDefined();
 				} catch (error) {
 					// Expected in test environment

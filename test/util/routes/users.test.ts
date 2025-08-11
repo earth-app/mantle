@@ -20,7 +20,7 @@ describe('Users Utility Functions', () => {
 			expect(typeof users.getUserByUsername).toBe('function');
 			expect(typeof users.getUserByEmail).toBe('function');
 			expect(typeof users.doesUsernameExist).toBe('function');
-			expect(typeof users.checkTableExists).toBe('function');
+			expect(typeof users.init).toBe('function');
 			expect(typeof users.updateUser).toBe('function');
 			expect(typeof users.loginUser).toBe('function');
 			expect(typeof users.getAuthenticatedUserFromContext).toBe('function');
@@ -54,7 +54,7 @@ describe('Users Utility Functions', () => {
 		});
 
 		it('should handle checkTableExists function', async () => {
-			const { checkTableExists } = await import('../../../src/util/routes/users');
+			const { init: checkTableExists } = await import('../../../src/util/routes/users');
 
 			const mockDB = (globalThis as any).mockBindings?.DB;
 			if (mockDB) {

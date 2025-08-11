@@ -1,18 +1,20 @@
-import { D1Database } from '@cloudflare/workers-types';
 import { com } from '@earth-app/ocean';
 import { basicAuth } from 'hono/basic-auth';
 import { bearerAuth } from 'hono/bearer-auth';
 
+import { createSchemaAcrossShards, first, firstAllShards, initializeAsync, KVShardMapper, run, runAllShards } from '@earth-app/collegedb';
 import { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { ContentfulStatusCode } from 'hono/utils/http-status';
 import Bindings from '../bindings';
+import { DBError, ValidationError } from '../types/errors';
+import { collegeDBConfig } from './collegedb';
 import * as encryption from './encryption';
 import { ADMIN_USER_OBJECT, getUserById, getUserByUsername } from './routes/users';
 import * as util from './util';
 
 type TokenRow = {
-	id: number;
+	id: bigint;
 	owner: string;
 	token: Uint8Array;
 	encryption_key: string;
@@ -24,9 +26,9 @@ type TokenRow = {
 	expires_at: Date;
 };
 
-export async function checkTableExists(d1: D1Database) {
+export async function init(bindings: Bindings) {
 	const query = `CREATE TABLE IF NOT EXISTS tokens (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY NOT NULL UNIQUE,
         owner TEXT NOT NULL,
         token BLOB NOT NULL,
         encryption_key TEXT NOT NULL,
@@ -35,22 +37,17 @@ export async function checkTableExists(d1: D1Database) {
         lookup_hash TEXT NOT NULL UNIQUE,
         salt TEXT NOT NULL,
         is_session BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        expires_at TIMESTAMP DEFAULT (datetime('now', '+30 days'))
-    )`;
-	await d1.prepare(query).run();
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        expires_at TIMESTAMP DEFAULT (datetime('now', '+30 days')) NOT NULL
+    );
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_lookup_hash ON tokens (lookup_hash);
+	CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens (owner);
+	CREATE INDEX IF NOT EXISTS idx_tokens_is_session ON tokens (is_session);
+	CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens (expires_at);`;
 
-	const hashIndexQuery = `CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_lookup_hash ON tokens (lookup_hash)`;
-	await d1.prepare(hashIndexQuery).run();
-
-	const ownerIndexQuery = `CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens (owner)`;
-	await d1.prepare(ownerIndexQuery).run();
-
-	const sessionIndexQuery = `CREATE INDEX IF NOT EXISTS idx_tokens_is_session ON tokens (is_session)`;
-	await d1.prepare(sessionIndexQuery).run();
-
-	const expiresIndexQuery = `CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens (expires_at)`;
-	await d1.prepare(expiresIndexQuery).run();
+	const config = collegeDBConfig(bindings);
+	await initializeAsync(config);
+	await createSchemaAcrossShards(config.shards, query);
 }
 
 async function hashToken(token: string, secret: Uint8Array): Promise<string> {
@@ -66,10 +63,9 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 	if (token.length != com.earthapp.util.API_KEY_LENGTH)
 		throw new Error(`Token must be ${com.earthapp.util.API_KEY_LENGTH} characters long`);
 
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	await init(bindings);
 
-	const count = await getTokenCount(owner, d1);
+	const count = await getTokenCount(owner, bindings);
 	if (count >= 5 && !is_session) {
 		throw new Error('Token limit reached for owner. Please remove an existing token before adding a new one.');
 	}
@@ -84,35 +80,35 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
 
-	const query = `INSERT INTO tokens (owner, token, encryption_key, encryption_iv, token_hash, lookup_hash, salt, is_session, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-	await d1
-		.prepare(query)
-		.bind(
-			owner,
-			encryptedToken,
-			JSON.stringify(encryptedKey),
-			util.toBase64(iv),
-			tokenHash,
-			lookupHash,
-			util.toBase64(salt),
-			is_session,
-			Date.now(),
-			new Date(Date.now() + expiration * 24 * 60 * 60 * 1000).toISOString()
-		)
-		.run();
+	const id = util.randomUint64();
+	const query = `INSERT INTO tokens (id, owner, token, encryption_key, encryption_iv, token_hash, lookup_hash, salt, is_session, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+	await run(id.toString(), query, [
+		id,
+		owner,
+		encryptedToken,
+		JSON.stringify(encryptedKey),
+		util.toBase64(iv),
+		tokenHash,
+		lookupHash,
+		util.toBase64(salt),
+		is_session,
+		Date.now(),
+		new Date(Date.now() + expiration * 24 * 60 * 60 * 1000).toISOString()
+	]);
+
+	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+	const shard = await mapper.getShardMapping(id.toString());
+	if (!shard) throw new DBError(`No shard found for ID ${id}`);
+	await mapper.setShardMapping(lookupHash, shard.shard, [`token-${lookupHash}`]);
 }
 
 export async function removeToken(token: string, bindings: Bindings) {
-	const d1 = bindings.DB;
-
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
 
-	const row = await d1
-		.prepare(`SELECT id, salt, token_hash FROM tokens WHERE lookup_hash = ?`)
-		.bind(lookupHash)
-		.first<{ id: number; salt: string; token_hash: string }>();
+	const query = 'SELECT id, salt, token_hash FROM tokens WHERE lookup_hash = ?';
+	const row = await first<{ id: number; salt: string; token_hash: string }>(`token-${lookupHash}`, query, [lookupHash]);
 
 	if (!row) return;
 
@@ -120,17 +116,21 @@ export async function removeToken(token: string, bindings: Bindings) {
 	const tokenHash = await hashToken(token, salt);
 
 	if (tokenHash === row.token_hash) {
-		await d1.prepare(`DELETE FROM tokens WHERE id = ?`).bind(row.id).run();
+		const deleteQuery = 'DELETE FROM tokens WHERE id = ?';
+		await run(row.id.toString(), deleteQuery, [row.id]);
+
+		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+		await mapper.deleteShardMapping(row.id.toString());
 	}
 }
 
 export async function isValidToken(token: string, bindings: Bindings) {
-	const d1 = bindings.DB;
-
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
-	const row = await d1.prepare(`SELECT * FROM tokens WHERE lookup_hash = ?`).bind(lookupHash).first<TokenRow>();
+	const row = (await firstAllShards<TokenRow>(`SELECT * FROM tokens WHERE lookup_hash = ? LIMIT 1`, [lookupHash])).filter(
+		(r) => r != null
+	)[0];
 
 	if (!row) return false;
 
@@ -156,26 +156,26 @@ export async function isValidToken(token: string, bindings: Bindings) {
 	return util.constantTimeEqual(new Uint8Array(decryptedToken), new TextEncoder().encode(token));
 }
 
-export async function getTokenCount(owner: string, d1: D1Database) {
-	if (!owner) throw new Error('Owner is required');
+export async function getTokenCount(owner: string, bindings: Bindings) {
+	if (!owner) throw new ValidationError('Owner is required');
 
-	await checkTableExists(d1);
+	await init(bindings);
 
-	const query = `SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = FALSE`;
-	const result = await d1.prepare(query).bind(owner).first<{ count: number }>();
+	const query = 'SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = FALSE';
+	const result = await firstAllShards<{ count: number }>(query, [owner]);
 
-	return result ? result.count : 0;
+	return result.filter((r) => r != null).reduce((sum, r) => sum + r.count, 0);
 }
 
 export async function getOwnerOfToken(token: string, bindings: Bindings) {
 	if (!token) throw new Error('Token is required');
 	if (token == bindings.ADMIN_API_KEY) return null; // Admin API key does not have an owner
 
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
-	const row = await d1.prepare(`SELECT owner FROM tokens WHERE lookup_hash = ?`).bind(lookupHash).first<{ owner: string }>();
+	const query = 'SELECT owner FROM tokens WHERE lookup_hash = ?';
+	const row = await first<{ owner: string }>(`token-${lookupHash}`, query, [lookupHash]);
 
 	if (!row) return null;
 
@@ -184,25 +184,25 @@ export async function getOwnerOfToken(token: string, bindings: Bindings) {
 
 // Session Management
 
-export async function validateSessions(owner: string, d1: D1Database) {
+export async function validateSessions(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
 
-	await checkTableExists(d1);
+	await init(bindings);
 
 	// Remove expired sessions
 	const expiredQuery = `DELETE FROM tokens WHERE owner = ? AND expires_at < CURRENT_TIMESTAMP AND is_session = TRUE`;
-	await d1.prepare(expiredQuery).bind(owner).run();
+	await runAllShards(expiredQuery, [owner]);
 
 	// Remove excess sessions
-	const sessionCount = await getSessionCount(owner, d1);
+	const sessionCount = await getSessionCount(owner, bindings);
 	if (sessionCount >= 3) {
 		const query = `SELECT id FROM tokens WHERE owner = ? AND is_session = TRUE ORDER BY created_at DESC LIMIT 1 OFFSET 2`;
-		const result = await d1.prepare(query).bind(owner).all<{ id: number }>();
+		const results = await firstAllShards<{ id: number }>(query, [owner]).then((rows) => rows.filter((r) => r != null));
 
-		if (result.results.length > 0) {
-			const idsToDelete = result.results.map((row) => row.id);
+		if (results.length > 0) {
+			const idsToDelete = results.map((row) => row.id);
 			const deleteQuery = `DELETE FROM tokens WHERE id IN (${idsToDelete.join(',')})`;
-			await d1.prepare(deleteQuery).run();
+			await runAllShards(deleteQuery, [owner]);
 		}
 	}
 }
@@ -222,7 +222,7 @@ export async function addSession(owner: string, bindings: Bindings, expiration: 
 	if (!owner) throw new Error('Owner is required');
 	const session = generateSessionToken();
 	await addToken(session, owner, bindings, expiration, true);
-	await validateSessions(owner, bindings.DB); // Ensure no more than 3 sessions
+	await validateSessions(owner, bindings); // Ensure no more than 3 sessions
 
 	return session;
 }
@@ -235,12 +235,11 @@ export async function removeSession(session: string, bindings: Bindings) {
 export async function isValidSession(session: string, bindings: Bindings) {
 	if (!session) throw new Error('Session Token is required');
 
-	const d1 = bindings.DB;
-
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const lookupHash = await encryption.computeLookupHash(session, bindings.LOOKUP_HMAC_KEY);
-	const row = await d1.prepare(`SELECT * FROM tokens WHERE lookup_hash = ? AND is_session = TRUE`).bind(lookupHash).first<TokenRow>();
+	const query = 'SELECT * FROM tokens WHERE lookup_hash = ? AND is_session = TRUE';
+	const row = await first<TokenRow>(`token-${lookupHash}`, query, [lookupHash]);
 
 	if (!row) return false;
 
@@ -266,24 +265,22 @@ export async function isValidSession(session: string, bindings: Bindings) {
 	return util.constantTimeEqual(new Uint8Array(decryptedToken), new TextEncoder().encode(session));
 }
 
-export async function getSessionCount(owner: string, d1: D1Database) {
+export async function getSessionCount(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
-
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const query = `SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = TRUE`;
-	const result = await d1.prepare(query).bind(owner).first<{ count: number }>();
+	const results = await firstAllShards<{ count: number }>(query, [owner]).then((rows) => rows.filter((r) => r != null));
 
-	return result ? result.count : 0;
+	return results.reduce((sum, row) => sum + row.count, 0);
 }
 
-export async function bumpCurrentSession(owner: string, d1: D1Database) {
+export async function bumpCurrentSession(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
-
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const query = `UPDATE tokens SET expires_at = datetime('now', '+14 days') WHERE owner = ? AND is_session = TRUE ORDER BY created_at DESC LIMIT 1`;
-	await d1.prepare(query).bind(owner).run();
+	await runAllShards(query, [owner]);
 }
 
 // Authentication Helpers

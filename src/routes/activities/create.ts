@@ -79,7 +79,7 @@ createActivity.post(
 			}
 		});
 
-		const obj = await activities.saveActivity(activity, c.env.DB);
+		const obj = await activities.saveActivity(activity, c.env);
 		if (!obj) {
 			return c.json(
 				{

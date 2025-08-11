@@ -1,9 +1,11 @@
+import { allAllShards, createSchemaAcrossShards, first, firstAllShards, initializeAsync, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com, kotlin } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Activity, ActivityObject, toActivity } from '../../types/activities';
 import { DBError, ValidationError } from '../../types/errors';
+import { collegeDBConfig } from '../collegedb';
 import * as cache from './cache';
 
 // Helpers
@@ -29,7 +31,7 @@ export function createActivity(
 export type DBActivity = {
 	id: string;
 	binary: Uint8Array;
-	created_at?: Date;
+	created_at: Date;
 	updated_at?: Date;
 };
 
@@ -49,38 +51,34 @@ function toActivityObject(activity: DBActivity | null): ActivityObject | null {
 	}
 }
 
-export async function checkTableExists(d1: D1Database) {
+export async function init(bindings: Bindings) {
 	const query = `CREATE TABLE IF NOT EXISTS activities (
 		id TEXT PRIMARY KEY NOT NULL UNIQUE,
 		binary BLOB NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	)`;
+	);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_activities_id ON activities(id);`;
 
-	const result = await d1.prepare(query).run();
-	if (result.error) {
-		throw new HTTPException(500, { message: `Failed to create activities table: ${result.error}` });
-	}
+	const config = collegeDBConfig(bindings);
+	await initializeAsync(config);
+	await createSchemaAcrossShards(config.shards, query);
 }
 
-async function findActivity(query: string, d1: D1Database, ...params: any[]): Promise<DBActivity[]> {
-	await checkTableExists(d1);
+async function findActivity(query: string, bindings: Bindings, ...params: any[]): Promise<DBActivity[]> {
+	await init(bindings);
 
-	const row = await d1
-		.prepare(query)
-		.bind(...params)
-		.all<DBActivity>();
+	const results = (await allAllShards<DBActivity>(query, params)).flatMap((row) => row.results);
+	if (!results || results.length === 0) throw new DBError(`No activities found for query: ${query}`);
 
-	if (!row || !row.success) throw new DBError(`No activities found for query: ${query} with params: '${params.join(', ')}'`);
-
-	return row.results;
+	return results;
 }
 
-export async function saveActivity(activity: com.earthapp.activity.Activity, d1: D1Database): Promise<ActivityObject> {
-	await checkTableExists(d1);
+export async function saveActivity(activity: com.earthapp.activity.Activity, bindings: Bindings): Promise<ActivityObject> {
+	await init(bindings);
 
 	const query = `INSERT INTO activities (id, binary) VALUES (?, ?)`;
-	const result = await d1.prepare(query).bind(activity.id, new Uint8Array(activity.toBinary())).run();
+	const result = await run(activity.id, query, [activity.id, new Uint8Array(activity.toBinary())]);
 
 	if (!result.success) throw new DBError(`Failed to save activity with ID ${activity.id}: ${result.error}`);
 
@@ -98,13 +96,13 @@ export async function saveActivity(activity: com.earthapp.activity.Activity, d1:
 }
 
 export async function updateActivity(obj: ActivityObject, bindings: Bindings): Promise<ActivityObject> {
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const query = `UPDATE activities SET binary = ?, updated_at = ? WHERE id = ? LIMIT 1`;
 	const updatedAt = new Date(); // Prevent mismatched timestamps in case SQL takes time
 
-	const result = await d1.prepare(query).bind(new Uint8Array(obj.activity.toBinary()), updatedAt.toISOString(), obj.activity.id).run();
+	const id0 = obj.activity.id.trim().toLowerCase();
+	const result = await run(id0, query, [new Uint8Array(obj.activity.toBinary()), updatedAt.toISOString(), obj.activity.id]);
 
 	if (!result.success) throw new DBError(`Failed to update activity with ID ${obj.activity.id}: ${result.error}`);
 
@@ -119,39 +117,40 @@ export async function updateActivity(obj: ActivityObject, bindings: Bindings): P
 		throw new DBError(`Failed to convert updated activity with ID ${obj.activity.id} to ActivityObject`);
 	}
 
-	const cacheKey = `activity:${obj.activity.id.trim().toLowerCase()}`;
+	const cacheKey = `activity:${id0}`;
 	cache.cache(cacheKey, updatedActivity.database, bindings.KV_CACHE);
 
 	return updatedActivity;
 }
 
 export async function deleteActivity(id: string, bindings: Bindings): Promise<boolean> {
-	const cacheKey = `activity:${id.trim().toLowerCase()}`;
-	await cache.clearCache(cacheKey, bindings.KV_CACHE);
+	await init(bindings);
 
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	const id0 = id.trim().toLowerCase();
 
 	const query = `DELETE FROM activities WHERE id = ? LIMIT 1`;
-	const result = await d1.prepare(query).bind(id).run();
+	const result = await run(id0, query, [id]);
+	if (!result.success) return false;
 
-	return result.success;
+	const cacheKey = `activity:${id0}`;
+	await cache.clearCache(cacheKey, bindings.KV_CACHE);
+
+	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+	mapper.deleteShardMapping(id0);
+
+	return true;
 }
 
 // Activity retrieval functions
 
 export async function getActivitiesCount(bindings: Bindings, search: string = ''): Promise<number> {
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	await init(bindings);
 
 	const query = `SELECT COUNT(*) as count FROM activities${search ? ' WHERE id LIKE ?' : ''}`;
 	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await d1
-		.prepare(query)
-		.bind(...params)
-		.first<{ count: number }>();
+	const result = await firstAllShards<{ count: number }>(query, params);
 
-	return result?.count ?? 0;
+	return result.filter((row) => row != null).reduce((sum, row) => sum + row.count, 0);
 }
 
 export async function getActivities(
@@ -164,14 +163,24 @@ export async function getActivities(
 
 	return (
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-			const d1 = bindings.DB;
-			const query = `SELECT * FROM activities${search ? ` WHERE id LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-			let results: DBActivity[];
+			await init(bindings);
 
-			if (search) results = await findActivity(query, d1, `%${search}%`, limit, page * limit);
-			else results = await findActivity(query, d1, limit, page * limit);
+			const offset = page * limit;
+			const searchQuery = search ? ' WHERE id LIKE ?' : '';
+			const query = `SELECT * FROM activities${searchQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+			const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
 
-			return results;
+			const results = await allAllShards<DBActivity>(query, params);
+
+			const allActivities: DBActivity[] = [];
+			results.forEach((result) => {
+				allActivities.push(...result.results);
+			});
+
+			allActivities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+			const paginatedPrompts = allActivities.slice(offset, offset + limit);
+			return await Promise.all(paginatedPrompts);
 		})
 	)
 		.map((activity) => toActivityObject(activity))
@@ -179,9 +188,8 @@ export async function getActivities(
 }
 
 export async function getRandomActivities(bindings: Bindings, limit: number = 25): Promise<ActivityObject[]> {
-	const d1 = bindings.DB;
 	const query = `SELECT * FROM activities ORDER BY RANDOM() LIMIT ?`;
-	const results = await findActivity(query, d1, limit);
+	const results = await findActivity(query, bindings, limit);
 
 	return results.map((activity) => toActivityObject(activity)).filter((activity) => activity !== null);
 }
@@ -189,14 +197,13 @@ export async function getRandomActivities(bindings: Bindings, limit: number = 25
 export async function doesActivityExist(id: string, bindings: Bindings): Promise<boolean> {
 	if (await cache.checkCacheExists(`activity:${id.trim().toLowerCase()}`, bindings.KV_CACHE)) return true;
 
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	await init(bindings);
 
-	const query = `SELECT COUNT(*) as count FROM activities WHERE id = ?`;
-	const result = await d1.prepare(query).bind(id).first<{ count: number }>();
+	const query = `SELECT COUNT(*) as count FROM activities WHERE id = ? LIMIT 1`;
+	const result = await firstAllShards<{ count: number }>(query, [id]);
 	if (!result) return false;
 
-	return result.count > 0;
+	return result.filter((row) => row != null).reduce((sum, row) => sum + row.count, 0) > 0;
 }
 
 export async function getActivityById(id: string, bindings: Bindings): Promise<ActivityObject | null> {
@@ -205,20 +212,13 @@ export async function getActivityById(id: string, bindings: Bindings): Promise<A
 
 	return toActivityObject(
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-			const d1 = bindings.DB;
-			await checkTableExists(d1);
+			await init(bindings);
 
 			const query = `SELECT * FROM activities WHERE id = ? LIMIT 1`;
-			const result = await d1.prepare(query).bind(id).first<DBActivity>();
-
+			const result = await first<DBActivity>(id.trim().toLowerCase(), query, [id]);
 			if (!result) return null;
 
-			return {
-				id: result.id,
-				binary: new Uint8Array(result.binary),
-				created_at: result.created_at ? new Date(result.created_at) : undefined,
-				updated_at: result.updated_at ? new Date(result.updated_at) : undefined
-			} satisfies DBActivity;
+			return result;
 		})
 	);
 }
@@ -257,7 +257,7 @@ export async function patchActivity(
 ): Promise<ActivityObject | null> {
 	const activity = activityObject.activity;
 	if (!activity) {
-		throw new ValidationError(`Activity with ID ${activityObject.public.id} not found`);
+		throw new ValidationError(`Activity with ID ${activityObject.database.id} not found`);
 	}
 
 	let newActivity = activity.deepCopy() as com.earthapp.activity.Activity;

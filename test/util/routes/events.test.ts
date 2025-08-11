@@ -22,7 +22,7 @@ describe('Events Utility Functions', () => {
 			expect(typeof events.getEvents).toBe('function');
 			expect(typeof events.doesEventExist).toBe('function');
 			expect(typeof events.patchEvent).toBe('function');
-			expect(typeof events.checkTableExists).toBe('function');
+			expect(typeof events.init).toBe('function');
 		});
 
 		it('should handle createEvent function', async () => {
@@ -45,7 +45,7 @@ describe('Events Utility Functions', () => {
 		});
 
 		it('should handle checkTableExists function', async () => {
-			const { checkTableExists } = await import('../../../src/util/routes/events');
+			const { init: checkTableExists } = await import('../../../src/util/routes/events');
 
 			const mockDB = (globalThis as any).mockBindings?.DB;
 			if (mockDB) {

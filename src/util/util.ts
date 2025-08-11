@@ -115,3 +115,9 @@ export function trimToByteLimit(str: string, byteLimit: number): string {
 	// If nothing fits, return empty; else join up to cut
 	return cut >= 0 ? chars.slice(0, cut + 1).join('') : '';
 }
+
+export function randomUint64(): bigint {
+	const hi = BigInt(Math.floor(Math.random() * 0x100000000));
+	const lo = BigInt(Math.floor(Math.random() * 0x100000000));
+	return (hi << 32n) | lo;
+}

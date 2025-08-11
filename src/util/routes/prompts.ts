@@ -1,7 +1,10 @@
+import { all, allAllShards, createSchemaAcrossShards, firstAllShards, initializeAsync, KVShardMapper, run } from '@earth-app/collegedb';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Prompt, PromptResponse } from '../../types/prompts';
+import { collegeDBConfig } from '../collegedb';
+import { randomUint64 } from '../util';
 import { cache, clearCache, tryCache } from './cache';
 import { getUserById } from './users';
 
@@ -16,7 +19,7 @@ export function createPrompt(prompt: string, visibility: string, owner: string):
 		const privacy = com.earthapp.account.Privacy.valueOf(visibility || 'PUBLIC');
 
 		return {
-			id: -1, // Placeholder ID, will be set by the database
+			id: randomUint64(),
 			owner_id: owner,
 			prompt,
 			visibility: privacy.name,
@@ -30,14 +33,14 @@ export function createPrompt(prompt: string, visibility: string, owner: string):
 	}
 }
 
-export function createPromptResponse(promptId: number, response: string, ownerId?: string): PromptResponse {
+export function createPromptResponse(promptId: bigint, response: string, ownerId?: string): PromptResponse {
 	try {
 		if (!response || typeof response !== 'string' || response.trim() === '') {
 			throw new HTTPException(400, { message: 'Response is required and must be a non-empty string.' });
 		}
 
 		return {
-			id: -1, // Placeholder ID, will be set by the database
+			id: randomUint64(),
 			prompt_id: promptId,
 			owner_id: ownerId,
 			response,
@@ -55,54 +58,42 @@ export function createPromptResponse(promptId: number, response: string, ownerId
 
 // Database
 
-export async function checkTableExists(d1: D1Database) {
-	const promptQuery = `CREATE TABLE IF NOT EXISTS prompts (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+export async function init(bindings: Bindings) {
+	const query = `CREATE TABLE IF NOT EXISTS prompts (
+		id INTEGER PRIMARY KEY NOT NULL UNIQUE,
 		prompt TEXT NOT NULL,
 		owner_id TEXT NOT NULL,
 		visibility TEXT NOT NULL DEFAULT 'PUBLIC',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)`;
+	);
+	CREATE INDEX IF NOT EXISTS idx_prompts_owner_id ON prompts(owner_id);
+	CREATE INDEX IF NOT EXISTS idx_prompts_prompt ON prompts(prompt);
+	CREATE INDEX IF NOT EXISTS idx_prompts_visibility ON prompts(visibility);
 
-	const promptResult = await d1.prepare(promptQuery).run();
-	if (promptResult.error) {
-		throw new HTTPException(500, { message: `Failed to create prompts table: ${promptResult.error}` });
-	}
-
-	// Indexes for performance
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_prompts_prompt ON prompts(prompt)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_prompts_created_at ON prompts(created_at)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_prompts_owner_id ON prompts(owner_id)`).run();
-
-	const promptResponseQuery = `CREATE TABLE IF NOT EXISTS prompt_responses (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
+	CREATE TABLE IF NOT EXISTS prompt_responses (
+		id INTEGER PRIMARY KEY NOT NULL UNIQUE,
 		prompt_id INTEGER NOT NULL,
 		owner_id TEXT NOT NULL,
 		response TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (prompt_id) REFERENCES prompts(id)
-		)`;
-	const promptResponseResult = await d1.prepare(promptResponseQuery).run();
-	if (promptResponseResult.error) {
-		throw new HTTPException(500, { message: `Failed to create prompt_responses table: ${promptResponseResult.error}` });
-	}
+	);
+	CREATE INDEX IF NOT EXISTS idx_prompt_responses_prompt_id ON prompt_responses(prompt_id);
+	CREATE INDEX IF NOT EXISTS idx_prompt_responses_owner_id ON prompt_responses(owner_id);
+	CREATE INDEX IF NOT EXISTS idx_prompt_responses_response ON prompt_responses(response);
+	CREATE INDEX IF NOT EXISTS idx_prompt_responses_created_at ON prompt_responses(created_at);`;
 
-	// Indexes for performance
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_prompt_responses_prompt_id ON prompt_responses(prompt_id)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_prompt_responses_response ON prompt_responses(response)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_prompt_responses_created_at ON prompt_responses(created_at)`).run();
+	const config = collegeDBConfig(bindings);
+	await initializeAsync(config);
+	await createSchemaAcrossShards(config.shards, query);
 }
 
-async function findPrompt(query: string, d1: D1Database, ...params: any[]): Promise<Prompt[]> {
-	await checkTableExists(d1);
+async function findPrompt(id: string, query: string, bindings: Bindings, ...params: any[]): Promise<Prompt[]> {
+	await init(bindings);
 
-	const row = await d1
-		.prepare(query)
-		.bind(...params)
-		.all<Prompt>();
-
+	const row = await all<Prompt>(id, query, params);
 	if (row.error) {
 		throw new HTTPException(500, { message: `Failed to find prompts: ${row.error}` });
 	}
@@ -116,18 +107,12 @@ async function findPromptResponse(
 	bindings: Bindings,
 	...params: any[]
 ): Promise<PromptResponse[]> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 
-	const row = await bindings.DB.prepare(query)
-		.bind(...params)
-		.all<PromptResponse>();
-
-	if (row.error) {
-		throw new HTTPException(500, { message: `Failed to find prompt responses: ${row.error}` });
-	}
+	const results = (await allAllShards<PromptResponse>(query, params)).flatMap((row) => row.results);
 
 	return Promise.all(
-		row.results.map(async (response) => {
+		results.map(async (response) => {
 			if (!response.owner_id) return response;
 
 			const owner = await getUserById(response.owner_id, bindings, ownerPrivacy);
@@ -144,14 +129,16 @@ async function findPromptResponse(
 	);
 }
 
-export async function savePrompt(prompt: Prompt, d1: D1Database): Promise<Prompt> {
-	await checkTableExists(d1);
+export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Prompt> {
+	await init(bindings);
 
 	try {
-		const result = await d1
-			.prepare(`INSERT INTO prompts (prompt, visibility, owner_id) VALUES (?, ?, ?)`)
-			.bind(prompt.prompt, prompt.visibility, prompt.owner_id)
-			.run();
+		const result = await run(prompt.id.toString(), `INSERT INTO prompts (id, prompt, visibility, owner_id) VALUES (?, ?, ?, ?)`, [
+			prompt.id,
+			prompt.prompt,
+			prompt.visibility,
+			prompt.owner_id
+		]);
 
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to save prompt: ${result.error}` });
@@ -165,18 +152,19 @@ export async function savePrompt(prompt: Prompt, d1: D1Database): Promise<Prompt
 	}
 }
 
-export async function updatePrompt(id: number, prompt: Prompt, bindings: Bindings): Promise<Prompt> {
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+export async function updatePrompt(id: bigint, prompt: Prompt, bindings: Bindings): Promise<Prompt> {
+	await init(bindings);
 
 	const updatedAt = new Date();
 	prompt.updated_at = updatedAt;
 
 	try {
-		const result = await d1
-			.prepare(`UPDATE prompts SET prompt = ?, visibility = ?, updated_at = ? WHERE id = ?`)
-			.bind(prompt.prompt, prompt.visibility, updatedAt, id)
-			.run();
+		const result = await run(id.toString(), `UPDATE prompts SET prompt = ?, visibility = ?, updated_at = ? WHERE id = ?`, [
+			prompt.prompt,
+			prompt.visibility,
+			updatedAt,
+			id
+		]);
 
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to update prompt: ${result.error}` });
@@ -193,12 +181,11 @@ export async function updatePrompt(id: number, prompt: Prompt, bindings: Binding
 	}
 }
 
-export async function deletePrompt(id: number, bindings: Bindings): Promise<void> {
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+export async function deletePrompt(id: bigint, bindings: Bindings): Promise<void> {
+	await init(bindings);
 
 	try {
-		const result = await d1.prepare(`DELETE FROM prompts WHERE id = ?`).bind(id).run();
+		const result = await run(id.toString(), `DELETE FROM prompts WHERE id = ?`);
 
 		if (result.results.length === 0) {
 			throw new HTTPException(404, { message: 'Prompt not found' });
@@ -210,20 +197,23 @@ export async function deletePrompt(id: number, bindings: Bindings): Promise<void
 
 		const cacheKey = `prompt:${id}`;
 		await clearCache(cacheKey, bindings.KV_CACHE);
+
+		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+		mapper.deleteShardMapping(id.toString());
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to delete prompt: ${error}` });
 	}
 }
 
-export async function savePromptResponse(prompt: Prompt, response: PromptResponse, d1: D1Database): Promise<PromptResponse> {
-	await checkTableExists(d1);
+export async function savePromptResponse(prompt: Prompt, response: PromptResponse, bindings: Bindings): Promise<PromptResponse> {
+	await init(bindings);
 
 	try {
-		const result = await d1
-			.prepare(`INSERT INTO prompt_responses (prompt_id, owner_id, response) VALUES (?, ?, ?)`)
-			.bind(prompt.id, response.owner_id, response.response)
-			.run();
-
+		const result = await run(
+			`prompt-response-${response.id}`,
+			`INSERT INTO prompt_responses (id, prompt_id, owner_id, response) VALUES (?, ?, ?, ?)`,
+			[response.id, prompt.id, response.owner_id, response.response]
+		);
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to save prompt response: ${result.error}` });
 		}
@@ -236,18 +226,18 @@ export async function savePromptResponse(prompt: Prompt, response: PromptRespons
 	}
 }
 
-export async function updatePromptResponse(id: number, response: PromptResponse, bindings: Bindings): Promise<PromptResponse> {
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+export async function updatePromptResponse(id: bigint, response: PromptResponse, bindings: Bindings): Promise<PromptResponse> {
+	await init(bindings);
 
 	const updatedAt = new Date();
 	response.updated_at = updatedAt;
 
 	try {
-		const result = await d1
-			.prepare(`UPDATE prompt_responses SET response = ?, updated_at = ? WHERE id = ?`)
-			.bind(response.response, updatedAt, id)
-			.run();
+		const result = await run(`prompt-response-${id}`, `UPDATE prompt_responses SET response = ?, updated_at = ? WHERE id = ?`, [
+			response.response,
+			updatedAt,
+			id
+		]);
 
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to update prompt response: ${result.error}` });
@@ -264,15 +254,14 @@ export async function updatePromptResponse(id: number, response: PromptResponse,
 	}
 }
 
-export async function deletePromptResponse(id: number, bindings: Bindings): Promise<void> {
+export async function deletePromptResponse(id: bigint, bindings: Bindings): Promise<void> {
 	const cacheKey = `prompt_response:${id}`;
 	await clearCache(cacheKey, bindings.KV_CACHE);
 
-	const d1 = bindings.DB;
-	await checkTableExists(d1);
+	await init(bindings);
 
 	try {
-		const result = await d1.prepare(`DELETE FROM prompt_responses WHERE id = ?`).bind(id).run();
+		const result = await run(`prompt-response-${id}`, `DELETE FROM prompt_responses WHERE id = ?`, [id]);
 
 		if (result.results.length === 0) {
 			throw new HTTPException(404, { message: 'Prompt response not found' });
@@ -281,6 +270,9 @@ export async function deletePromptResponse(id: number, bindings: Bindings): Prom
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to delete prompt response: ${result.error}` });
 		}
+
+		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+		mapper.deleteShardMapping(`prompt-response-${id}`);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to delete prompt response: ${error}` });
 	}
@@ -291,35 +283,44 @@ export async function deletePromptResponse(id: number, bindings: Bindings): Prom
 export async function getPrompts(bindings: Bindings, limit: number = 25, page: number = 0, search: string = ''): Promise<Prompt[]> {
 	const cacheKey = `prompts:${limit}:${page}:${search.trim().toLowerCase()}`;
 	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		const d1 = bindings.DB;
-		const query = `SELECT * FROM prompts${search ? ` WHERE prompt LIKE ?` : ''} ORDER BY date DESC LIMIT ? OFFSET ?`;
-		let results: Prompt[];
+		await init(bindings);
 
-		if (search) results = await findPrompt(query, d1, `%${search}%`, limit, page * limit);
-		else results = await findPrompt(query, d1, limit, page * limit);
+		const offset = page * limit;
+		const searchQuery = search ? ' WHERE prompt LIKE ?' : '';
+		const query = `SELECT * FROM prompts${searchQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+		const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
 
-		return results;
+		const results = await allAllShards<Prompt>(query, params);
+
+		const allPrompts: Prompt[] = [];
+		results.forEach((result) => {
+			allPrompts.push(...result.results);
+		});
+
+		allPrompts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+		const paginatedPrompts = allPrompts.slice(offset, offset + limit);
+		return await Promise.all(paginatedPrompts);
 	});
 }
 
 export async function getPromptsCount(bindings: Bindings, search: string = ''): Promise<number> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 	const query = `SELECT COUNT(*) as count FROM prompts${search ? ' WHERE prompt LIKE ?' : ''}`;
 	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await bindings.DB.prepare(query)
-		.bind(...params)
-		.first<{ count: number }>();
+	const result = await firstAllShards<{ count: number }>(query, params);
 
-	return result?.count ?? 0;
+	if (!result || result.length === 0) return 0;
+
+	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
 }
 
-export async function getPromptById(id: number, bindings: Bindings): Promise<Prompt | null> {
+export async function getPromptById(id: bigint, bindings: Bindings): Promise<Prompt | null> {
 	const cacheKey = `prompt:${id}`;
 
 	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		const d1 = bindings.DB;
 		const query = `SELECT * FROM prompts WHERE id = ?`;
-		const prompts = await findPrompt(query, d1, id);
+		const prompts = await findPrompt(id.toString(), query, bindings, id);
 		return prompts.length > 0 ? prompts[0] : null;
 	});
 }
@@ -327,7 +328,7 @@ export async function getPromptById(id: number, bindings: Bindings): Promise<Pro
 // Prompt response retrieval functions
 
 export async function getPromptResponses(
-	promptId: number,
+	promptId: bigint,
 	bindings: Bindings,
 	limit: number = 25,
 	page: number = 0,
@@ -344,7 +345,7 @@ export async function getPromptResponses(
 }
 
 export async function getPromptResponseById(
-	id: number,
+	id: bigint,
 	bindings: Bindings,
 	ownerPrivacy: com.earthapp.account.Privacy
 ): Promise<PromptResponse | null> {

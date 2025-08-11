@@ -1,15 +1,26 @@
-import { Ai, D1Database } from '@cloudflare/workers-types';
+import { Ai } from '@cloudflare/workers-types';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
-import { LoginUser, User, UserObject, toUser } from '../../types/users';
+import { LoginUser, toUser, User, UserObject } from '../../types/users';
 import { addSession, getOwnerOfBearer, getOwnerOfToken } from '../authentication';
 import * as encryption from '../encryption';
 import * as util from '../util';
 
+import {
+	all,
+	allAllShards,
+	createSchemaAcrossShards,
+	first,
+	firstAllShards,
+	initializeAsync,
+	KVShardMapper,
+	run
+} from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 import { DBError, ValidationError } from '../../types/errors';
+import { collegeDBConfig } from '../collegedb';
 
 // Helpers
 
@@ -81,10 +92,10 @@ async function toUserObject(row: DBUser, fieldPrivacy: com.earthapp.account.Priv
 	return { public: toUser(accountData, fieldPrivacy, row.created_at, row.updated_at, row.last_login), database: row, account: accountData };
 }
 
-export async function checkTableExists(d1: D1Database) {
+export async function init(bindings: Bindings) {
 	const query = `CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY NOT NULL,
-        username TEXT NOT NULL,
+        id TEXT PRIMARY KEY NOT NULL UNIQUE,
+        username TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
         salt TEXT NOT NULL,
         binary BLOB NOT NULL,
@@ -93,18 +104,16 @@ export async function checkTableExists(d1: D1Database) {
         last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`;
-	const result = await d1.prepare(query).run();
-	if (result.error) {
-		throw new DBError(`Failed to create users table: ${result.error}`);
-	}
+    );
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username);
+	CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC);
+	CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC);`;
 
-	// Indexes for performance
-	await d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id)`).run();
-	await d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC)`).run();
-	await d1.prepare(`CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC)`).run();
+	const config = collegeDBConfig(bindings);
+	await initializeAsync(config);
+	await createSchemaAcrossShards(config.shards, query);
 }
 
 // User Functions
@@ -112,7 +121,7 @@ export async function checkTableExists(d1: D1Database) {
 // Save User Function
 
 export async function saveUser(user: com.earthapp.account.Account, password: string, bindings: Bindings) {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 
 	if (password.length < 8 || password.length > 100)
 		throw new HTTPException(400, { message: 'Password must be between 8 and 100 characters' });
@@ -128,42 +137,42 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 	const encryptedData = await encryption.encryptData(key.rawKey, data, iv);
 
 	const exists = `SELECT COUNT(*) as count FROM users WHERE id = ?`;
-	const countResult = await bindings.DB.prepare(exists).bind(user.id).first<{ count: number }>();
-
+	const countResult = await first<{ count: number }>(user.id, exists, [user.id]);
 	if (!countResult) throw new DBError(`Failed to check if user '${user.id}' exists`);
 
 	let result: D1Result;
 	if (countResult.count > 0) {
 		// Update existing user
 		const updateQuery = `UPDATE users SET username = ?, password = ?, salt = ?, binary = ?, encryption_key = ?, encryption_iv = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-		result = await bindings.DB.prepare(updateQuery)
-			.bind(
-				user.username,
-				util.toBase64(hashedPassword),
-				util.toBase64(salt),
-				encryptedData,
-				JSON.stringify(encryptedKey),
-				util.toBase64(iv),
-				user.id
-			)
-			.run();
+		result = await run(user.id, updateQuery, [
+			user.username,
+			util.toBase64(hashedPassword),
+			util.toBase64(salt),
+			encryptedData,
+			JSON.stringify(encryptedKey),
+			util.toBase64(iv),
+			user.id
+		]);
 	} else {
 		// Insert new user
 		const query = `INSERT INTO users (id, username, password, salt, binary, encryption_key, encryption_iv) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-		result = await bindings.DB.prepare(query)
-			.bind(
-				user.id,
-				user.username,
-				util.toBase64(hashedPassword),
-				util.toBase64(salt),
-				encryptedData,
-				JSON.stringify(encryptedKey),
-				util.toBase64(iv)
-			)
-			.run();
+		result = await run(user.id, query, [
+			user.id,
+			user.username,
+			util.toBase64(hashedPassword),
+			util.toBase64(salt),
+			encryptedData,
+			JSON.stringify(encryptedKey),
+			util.toBase64(iv)
+		]);
 	}
 
 	if (!result.success) throw new DBError(`Failed to save user '${user.id}': ${result.error}`);
+
+	const mapper = new KVShardMapper(bindings.KV);
+	const shard = await mapper.getShardMapping(user.id);
+	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.id}' after creation`);
+	mapper.setShardMapping(user.id, shard.shard, [`username:${user.username}`]);
 
 	return await getUserById(user.id, bindings);
 }
@@ -171,7 +180,7 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 // Update User Function
 
 export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings): Promise<UserObject> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 
 	const data = new Uint8Array(user.account.toBinary());
 	const encryptionKey = JSON.parse(user.database.encryption_key);
@@ -185,7 +194,7 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 
 	const query = `UPDATE users SET username = ?, binary = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
 
-	const res = await bindings.DB.prepare(query).bind(user.account.username, encryptedData, user.database.id).run();
+	const res = await run(user.database.id, query, [user.account.username, encryptedData, user.database.id]);
 	if (!res.success) throw new DBError(`Failed to update user '${user.account.id}': ${res.error}`);
 
 	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
@@ -193,10 +202,9 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 	return user;
 }
 
-async function findUser(query: string, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings, ...params: any[]) {
-	const result = await bindings.DB.prepare(query)
-		.bind(...params)
-		.all<DBUser>();
+async function findUser(id: string, query: string, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings, ...params: any[]) {
+	await init(bindings);
+	const result = await all<DBUser>(id, query, params);
 
 	return await Promise.all(result.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
@@ -205,7 +213,7 @@ async function findUser(query: string, fieldPrivacy: com.earthapp.account.Privac
 
 // assume already authenticated via Basic Auth
 export async function loginUser(username: string, bindings: Bindings): Promise<LoginUser> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 
 	const dbuser = await getUserByUsername(username, bindings);
 	if (!dbuser) throw new HTTPException(401, { message: 'User not found, not authorized' });
@@ -217,7 +225,7 @@ export async function loginUser(username: string, bindings: Bindings): Promise<L
 
 	// Update last login
 	const query = `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?`;
-	await bindings.DB.prepare(query).bind(user.id).run();
+	await run(user.id, query, [user.id]);
 
 	return {
 		id: user.id,
@@ -401,37 +409,45 @@ export async function getUsers(
 	search: string = '',
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ): Promise<UserObject[]> {
-	await checkTableExists(bindings.DB);
-	const query = `SELECT * FROM users${search ? ` WHERE username LIKE ?` : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+	await init(bindings);
 
-	const statement = bindings.DB.prepare(query);
-	let results: D1Result<DBUser>;
-	if (search) results = await statement.bind(`%${search}%`, limit, page * limit).all<DBUser>();
-	else results = await statement.bind(limit, page * limit).all<DBUser>();
+	const offset = page * limit;
+	const searchQuery = search ? ' WHERE username LIKE ?' : '';
+	const query = `SELECT * FROM users${searchQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+	const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
 
-	if (!results || results.error) throw new DBError(`Failed to retrieve users: ${results.error}`);
+	const results = await allAllShards<DBUser>(query, params);
 
-	return Promise.all(results.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
+	const allUsers: DBUser[] = [];
+	results.forEach((result) => {
+		allUsers.push(...result.results);
+	});
+
+	allUsers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+	const paginatedUsers = allUsers.slice(offset, offset + limit);
+	return await Promise.all(paginatedUsers.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
 
 export async function getUsersCount(bindings: Bindings, search: string = ''): Promise<number> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 	const query = `SELECT COUNT(*) as count FROM users${search ? ' WHERE username LIKE ?' : ''}`;
 	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await bindings.DB.prepare(query)
-		.bind(...params)
-		.first<{ count: number }>();
+	const result = await firstAllShards<{ count: number }>(query, params);
 
-	return result?.count ?? 0;
+	if (!result || result.length === 0) return 0;
+
+	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
 }
 
 export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 	const query = `SELECT COUNT(*) as count FROM users WHERE username = ?`;
-	const result = await bindings.DB.prepare(query).bind(username).first<{ count: number }>();
-	if (!result) return false;
+	const result = await firstAllShards<{ count: number }>(query, [username]);
 
-	return result.count > 0;
+	if (!result || result.length === 0) return false;
+
+	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0) > 0;
 }
 
 export async function getUserById(
@@ -439,8 +455,7 @@ export async function getUserById(
 	bindings: Bindings,
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ) {
-	await checkTableExists(bindings.DB);
-	const results = await findUser('SELECT * FROM users WHERE id = ? LIMIT 1', fieldPrivacy, bindings, id);
+	const results = await findUser(id, 'SELECT * FROM users WHERE id = ? LIMIT 1', fieldPrivacy, bindings, id);
 	return results.length ? results[0] : null;
 }
 
@@ -449,8 +464,13 @@ export async function getUserByUsername(
 	bindings: Bindings,
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ) {
-	await checkTableExists(bindings.DB);
-	const results = await findUser('SELECT * FROM users WHERE username = ? LIMIT 1', fieldPrivacy, bindings, username);
+	const results = await findUser(
+		`username:${username}`,
+		'SELECT * FROM users WHERE username = ? LIMIT 1',
+		fieldPrivacy,
+		bindings,
+		username
+	);
 	return results.length ? results[0] : null;
 }
 
@@ -458,8 +478,6 @@ export async function getAccountBy(
 	predicate: (account: com.earthapp.account.Account) => boolean,
 	bindings: Bindings
 ): Promise<UserObject | null> {
-	await checkTableExists(bindings.DB);
-
 	let user: UserObject | null = null;
 	let page = 0;
 	while (!user) {
@@ -525,9 +543,12 @@ export async function patchUser(userObject: UserObject, bindings: Bindings, data
 }
 
 export async function deleteUser(id: string, bindings: Bindings): Promise<boolean> {
-	await checkTableExists(bindings.DB);
+	await init(bindings);
 
-	const result = await bindings.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(id).run();
+	const result = await run(id, `DELETE FROM users WHERE id = ?`);
+
+	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+	mapper.deleteShardMapping(id);
 
 	return result.success;
 }

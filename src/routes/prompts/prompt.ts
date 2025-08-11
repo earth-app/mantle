@@ -61,7 +61,7 @@ prompt.get(
 			);
 		}
 
-		const promptId = parseInt(id, 10);
+		const promptId = BigInt(id);
 		if (promptId <= 0) {
 			return c.json(
 				{
@@ -142,7 +142,7 @@ prompt.patch(
 			);
 		}
 
-		const promptId = parseInt(id, 10);
+		const promptId = BigInt(id);
 		if (promptId <= 0) {
 			return c.json(
 				{
@@ -241,7 +241,7 @@ prompt.delete(
 			);
 		}
 
-		const promptId = parseInt(id, 10);
+		const promptId = BigInt(id);
 		if (promptId <= 0) {
 			return c.json(
 				{
@@ -332,7 +332,7 @@ prompt.get(
 			);
 		}
 
-		const promptId = parseInt(id, 10);
+		const promptId = BigInt(id);
 		if (promptId <= 0) {
 			return c.json(
 				{
@@ -410,7 +410,7 @@ prompt.post(
 			);
 		}
 
-		const id = parseInt(promptId, 10);
+		const id = BigInt(promptId);
 		if (id <= 0) {
 			return c.json(
 				{
@@ -446,7 +446,7 @@ prompt.post(
 		}
 
 		const promptResponse = prompts.createPromptResponse(id, content, owner.account.id);
-		const response = await prompts.savePromptResponse(existingPrompt, promptResponse, c.env.DB);
+		const response = await prompts.savePromptResponse(existingPrompt, promptResponse, c.env);
 
 		return c.json(response, 201);
 	}
@@ -511,8 +511,8 @@ prompt.get(
 			);
 		}
 
-		const id = parseInt(promptId, 10);
-		const resId = parseInt(responseId, 10);
+		const id = BigInt(promptId);
+		const resId = BigInt(responseId);
 		if (id <= 0 || resId <= 0) {
 			return c.json(
 				{
@@ -609,10 +609,10 @@ prompt.patch(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const promptId = parseInt(c.req.param('promptId'), 10);
-		const responseId = parseInt(c.req.param('responseId'), 10);
+		const prompt0 = c.req.param('promptId');
+		const response0 = c.req.param('responseId');
 
-		if (Number.isNaN(promptId) || Number.isNaN(responseId)) {
+		if (Number.isNaN(prompt0) || Number.isNaN(response0)) {
 			return c.json(
 				{
 					code: 400,
@@ -621,6 +621,9 @@ prompt.patch(
 				400
 			);
 		}
+
+		const promptId = BigInt(prompt0);
+		const responseId = BigInt(response0);
 
 		if (promptId <= 0 || responseId <= 0) {
 			return c.json(
@@ -724,9 +727,9 @@ prompt.delete(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const responseId = parseInt(c.req.param('responseId'), 10);
+		const response0 = c.req.param('responseId');
 
-		if (Number.isNaN(responseId)) {
+		if (Number.isNaN(response0)) {
 			return c.json(
 				{
 					code: 400,
@@ -735,6 +738,8 @@ prompt.delete(
 				400
 			);
 		}
+
+		const responseId = BigInt(response0);
 
 		if (responseId <= 0) {
 			return c.json(

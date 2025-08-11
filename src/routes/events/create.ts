@@ -82,7 +82,7 @@ createEvent.post(
 			);
 		}
 
-		const obj = await events.saveEvent(event, c.env.DB);
+		const obj = await events.saveEvent(event, c.env);
 		return c.json(obj.public, 201);
 	}
 );
