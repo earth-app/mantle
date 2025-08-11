@@ -1,0 +1,118 @@
+{
+	"name": "earthapp-mantle",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-04-28",
+	"compatibility_flags": ["nodejs_compat"],
+	"routes": [
+		{
+			"pattern": "api.earth-app.com",
+			"custom_domain": true
+		}
+	],
+	"send_metrics": false,
+	"assets": {
+		"directory": "public",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
+	"ai": {
+		"binding": "AI"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "322faefd5628471cb7cea08cf041804a"
+		},
+		{
+			"binding": "KV_CACHE",
+			"id": "5210f267e03042ecb0e7175c4f985e2d"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "earth-app",
+			"preview_bucket_name": "earth-app-preview"
+		}
+	],
+	"unsafe": {
+		"bindings": [
+			{
+				"name": "ANONYMOUS_RATE_LIMIT",
+				"type": "ratelimit",
+				"namespace_id": "2151",
+				"simple": {
+					"limit": 100,
+					"period": 60
+				}
+			},
+			{
+				"name": "AUTH_RATE_LIMIT",
+				"type": "ratelimit",
+				"namespace_id": "2152",
+				"simple": {
+					"limit": 1000,
+					"period": 60
+				}
+			}
+		]
+	},
+	// Databases
+	"d1_databases": [
+		// Primary
+		{
+			"binding": "DB_PRIMARY",
+			"database_name": "earth-app",
+			"database_id": "4c88abe1-6768-4f17-8cc6-8b8e41475a34"
+		},
+		// Eastern North America
+		{
+			"binding": "DB_EN1",
+			"database_name": "earth-app_en1",
+			"database_id": "8ae29346-c4fb-43ad-8854-5f248a4bc16c"
+		},
+		{
+			"binding": "DB_EN2",
+			"database_name": "earth-app_en2",
+			"database_id": "15468d93-50b4-4d39-ae65-1fcb00fdb554"
+		},
+		{
+			"binding": "DB_EN3",
+			"database_name": "earth-app_en3",
+			"database_id": "55942853-6300-431b-a54c-ce588d63e006"
+		},
+		// Western North America
+		{
+			"binding": "DB_WN1",
+			"database_name": "earth-app_wn1",
+			"database_id": "a303f45a-57e0-4c16-928a-a22c94246a53"
+		},
+		// Western Europe
+		{
+			"binding": "DB_WE1",
+			"database_name": "earth-app_we1",
+			"database_id": "8a208f6f-680a-4f72-a60a-3170864ad052"
+		},
+		// Eastern Europe
+		{
+			"binding": "DB_EE1",
+			"database_name": "earth-app_ee1",
+			"database_id": "e543f683-f66b-4e43-a6be-32288966954f"
+		},
+		// Asia Pacific
+		{
+			"binding": "DB_AP1",
+			"database_name": "earth-app_ap1",
+			"database_id": "196db2a6-a5b1-42f8-b9ab-707a2f6782d1"
+		},
+		// Oceania
+		{
+			"binding": "DB_OC1",
+			"database_name": "earth-app_oc1",
+			"database_id": "ea1b6021-3e87-4aac-96c3-d8abb1cc84f3"
+		}
+	]
+}
