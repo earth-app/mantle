@@ -10,10 +10,13 @@ import { secureHeaders } from 'hono/secure-headers';
 import routes from './routes';
 import { globalRateLimit } from './util/ratelimit';
 
+import { Request } from '@cloudflare/workers-types';
+import { getClosestRegionFromIP } from '@earth-app/collegedb';
 import { HTTPException } from 'hono/http-exception';
 import * as packageJson from '../package.json';
 import Bindings from './bindings';
 import { DBError, ValidationError } from './types/errors';
+import { setCurrentRegion } from './util/collegedb';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -72,11 +75,15 @@ app.use(
 	})
 );
 app.use((c, next) => {
+	// Custom headers middleware
 	c.res.headers.set('X-Earth-App-Version', packageJson.version);
 	c.res.headers.set('X-Earth-App-Name', packageJson.name);
 
+	// Set Target Region
+	setCurrentRegion(getClosestRegionFromIP(c.req.raw as unknown as Request));
+
 	return next();
-}); // Custom headers middleware
+});
 
 app.get(
 	'/v1/*',

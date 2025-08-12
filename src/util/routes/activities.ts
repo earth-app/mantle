@@ -98,6 +98,8 @@ export async function saveActivity(activity: com.earthapp.activity.Activity, bin
 		throw new DBError(`Failed to convert saved activity with ID ${activity.id} to ActivityObject`);
 	}
 
+	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
+
 	return newActivity;
 }
 

@@ -1,7 +1,7 @@
 import { CollegeDBConfig, D1Region, initializeAsync } from '@earth-app/collegedb';
 import Bindings from '../bindings';
 
-export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): CollegeDBConfig =>
+export const collegeDBConfig = (bindings: Bindings): CollegeDBConfig =>
 	({
 		kv: bindings.KV,
 		shards: {
@@ -23,7 +23,7 @@ export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): Co
 		},
 		hashShardMappings: false,
 		// Higher priority = more preferred
-		targetRegion: targetRegion ?? 'enam',
+		targetRegion: currentRegion ?? 'enam',
 		shardLocations: {
 			primary: { region: 'enam', priority: 3 },
 			en1: { region: 'enam', priority: 2 },
@@ -41,10 +41,16 @@ export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): Co
 		debug: false
 	}) satisfies CollegeDBConfig;
 
+export let currentRegion: D1Region | undefined = undefined;
 export let collegeDB: CollegeDBConfig;
 
 export async function init(bindings: Bindings) {
 	if (collegeDB) return;
 	collegeDB = collegeDBConfig(bindings);
 	await initializeAsync(collegeDB);
+}
+
+export async function setCurrentRegion(region: D1Region) {
+	if (currentRegion) return;
+	currentRegion = region;
 }
