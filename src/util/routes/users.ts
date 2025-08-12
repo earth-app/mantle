@@ -622,20 +622,14 @@ export async function generateProfilePhoto(user: User, ai: Ai): Promise<Uint8Arr
 export async function getProfilePhoto(user: User, bindings: Bindings): Promise<Uint8Array> {
 	const profileImage = `users/${user.id}/profile.png`;
 
-	if (await bindings.R2.head(profileImage)) {
-		return (await bindings.R2.get(profileImage))!.bytes();
-	}
+	const bytes = (await bindings.R2.get(profileImage))?.bytes();
+	if (bytes) return bytes;
 
-	return (await bindings.ASSETS.fetch('https://assets.local/favicon.png'))!.bytes();
+	return (await bindings.ASSETS.fetch('https://assets.local/earth-app.png'))!.bytes();
 }
 
 export async function newProfilePhoto(user: User, bindings: Bindings) {
 	const profileImage = `users/${user.id}/profile.png`;
-	if (await bindings.R2.head(profileImage)) {
-		// Delete existing profile photo
-		await bindings.R2.delete(profileImage);
-	}
-
 	const profile = await generateProfilePhoto(user, bindings.AI);
 	await bindings.R2.put(profileImage, profile);
 
