@@ -169,7 +169,7 @@ export async function getTokenCount(owner: string, bindings: Bindings) {
 
 export async function getOwnerOfToken(token: string, bindings: Bindings) {
 	if (!token) throw new Error('Token is required');
-	if (token == bindings.ADMIN_API_KEY) return null; // Admin API key does not have an owner
+	if (token === bindings.ADMIN_API_KEY) return ADMIN_USER_OBJECT;
 
 	await init(bindings);
 

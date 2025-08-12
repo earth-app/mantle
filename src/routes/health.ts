@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import z from 'zod';
+import * as schemas from '../openapi/schemas';
 import * as tags from '../openapi/tags';
 
 import Bindings from '../bindings';
@@ -45,13 +46,15 @@ healthCheck.get(
 					}
 				}
 			},
+			401: schemas.unauthorized,
+			403: schemas.forbidden,
 			500: {
 				description: 'Health check failed',
 				content: {
 					'application/json': {
 						schema: resolver(
 							z.object({
-								code: z.number(),
+								code: z.number().int().min(500).max(500),
 								message: z.string()
 							})
 						)
