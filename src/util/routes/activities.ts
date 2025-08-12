@@ -98,7 +98,7 @@ export async function saveActivity(activity: com.earthapp.activity.Activity, bin
 		throw new DBError(`Failed to convert saved activity with ID ${activity.id} to ActivityObject`);
 	}
 
-	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
+	await cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
 
 	return newActivity;
 }
@@ -126,7 +126,7 @@ export async function updateActivity(obj: ActivityObject, bindings: Bindings): P
 	}
 
 	await cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
-	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
+	await cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
 
 	return updatedActivity;
 }
@@ -144,7 +144,7 @@ export async function deleteActivity(id: string, aliases: string[], bindings: Bi
 	mapper.deleteShardMapping(id0);
 
 	await cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
-	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
+	await cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
 
 	for (const alias of aliases) {
 		const alias0 = alias.trim().toLowerCase();

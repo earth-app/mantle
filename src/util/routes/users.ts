@@ -152,7 +152,7 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.id}' after creation`);
 	await mapper.setShardMapping(user.id, shard.shard, [`username:${user.username}`]);
 
-	cache.clearCachePrefix(`users:count:`, bindings.KV_CACHE);
+	await cache.clearCachePrefix(`users:count:`, bindings.KV_CACHE);
 
 	return {
 		public: toUser(user, com.earthapp.account.Privacy.PRIVATE, new Date(), new Date(), new Date()),
@@ -557,8 +557,8 @@ export async function deleteUser(id: string, username: string, bindings: Binding
 	mapper.deleteShardMapping(id);
 	mapper.deleteShardMapping(`username:${username}`);
 
-	cache.clearCache(`user:exists:${username}`, bindings.KV_CACHE);
-	cache.clearCachePrefix(`users:count:`, bindings.KV_CACHE);
+	await cache.clearCache(`user:exists:${username}`, bindings.KV_CACHE);
+	await cache.clearCachePrefix(`users:count:`, bindings.KV_CACHE);
 
 	return result.success;
 }

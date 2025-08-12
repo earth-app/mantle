@@ -192,8 +192,7 @@ export async function updateEvent(obj: EventObject, bindings: Bindings): Promise
 		throw new DBError(`Failed to convert updated event to EventObject: ${obj.event.id}`);
 	}
 
-	const cacheKey = `event:${obj.event.id}`;
-	cache.clearCache(cacheKey, bindings.KV_CACHE);
+	await cache.clearCache(`event:${obj.event.id}`, bindings.KV_CACHE);
 
 	return updatedEvent;
 }

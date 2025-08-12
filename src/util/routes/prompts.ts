@@ -152,7 +152,7 @@ export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Pr
 		prompt.created_at = new Date();
 		prompt.updated_at = new Date();
 
-		cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
+		await cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
 
 		return prompt;
 	} catch (error) {
@@ -180,8 +180,7 @@ export async function updatePrompt(id: string, prompt: Prompt, bindings: Binding
 
 		const obj = { ...prompt, id };
 
-		const cacheKey = `prompt:${id}`;
-		cache.clearCache(cacheKey, bindings.KV_CACHE);
+		await cache.clearCache(`prompt:${id}`, bindings.KV_CACHE);
 
 		return obj;
 	} catch (error) {
@@ -204,8 +203,8 @@ export async function deletePrompt(id: string, bindings: Bindings): Promise<void
 		}
 
 		const cacheKey = `prompt:${id}`;
-		cache.clearCache(cacheKey, bindings.KV_CACHE);
-		cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
+		await cache.clearCache(cacheKey, bindings.KV_CACHE);
+		await cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 		mapper.deleteShardMapping(id);
