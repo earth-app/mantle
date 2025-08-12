@@ -125,8 +125,8 @@ export async function updateActivity(obj: ActivityObject, bindings: Bindings): P
 		throw new DBError(`Failed to convert updated activity with ID ${obj.activity.id} to ActivityObject`);
 	}
 
-	const cacheKey = `activity:${id0}`;
-	cache.clearCache(cacheKey, bindings.KV_CACHE);
+	cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
+	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
 
 	return updatedActivity;
 }
@@ -140,11 +140,11 @@ export async function deleteActivity(id: string, bindings: Bindings): Promise<bo
 	const result = await run(id0, query, [id]);
 	if (!result.success) return false;
 
-	const cacheKey = `activity:${id0}`;
-	await cache.clearCache(cacheKey, bindings.KV_CACHE);
-
 	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 	mapper.deleteShardMapping(id0);
+
+	cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
+	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
 
 	return true;
 }
