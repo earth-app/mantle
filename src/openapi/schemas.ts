@@ -360,7 +360,8 @@ export const activityCreate = z
 		name: text,
 		description: text.optional(),
 		types: z.array(activityType),
-		aliases: z.array(z.string()).optional()
+		aliases: z.array(z.string()).optional(),
+		fields: z.record(z.string()).optional()
 	})
 	.openapi({
 		example: {
@@ -368,7 +369,10 @@ export const activityCreate = z
 			name: 'Hiking',
 			description: 'A fun outdoor activity',
 			types: ['HOBBY', 'SPORT'],
-			aliases: ['walking', 'trekking']
+			aliases: ['walking', 'trekking'],
+			fields: {
+				difficulty: 'hard'
+			}
 		}
 	});
 
