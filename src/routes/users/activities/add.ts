@@ -8,7 +8,6 @@ import * as tags from '../../../openapi/tags';
 // Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../../bindings';
-import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getActivityById } from '../../../util/routes/activities';
 import { getAuthenticatedUserFromContext, updateUser } from '../../../util/routes/users';
 
@@ -47,7 +46,6 @@ addUserActivity.put(
 		},
 		tags: [tags.USERS, tags.ACTIVITIES]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const activityId = c.req.query('activityId');
 		if (!activityId || activityId.length !== com.earthapp.util.ID_LENGTH) {

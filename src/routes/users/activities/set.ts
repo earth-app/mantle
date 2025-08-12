@@ -11,7 +11,6 @@ import { validateMiddleware } from '../../../util/validation';
 // Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../../bindings';
-import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getActivityById } from '../../../util/routes/activities';
 import { getAuthenticatedUserFromContext, updateUser } from '../../../util/routes/users';
 
@@ -50,7 +49,6 @@ setUserActivities.patch(
 		},
 		tags: [tags.USERS, tags.ACTIVITIES]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const body = c.req.valid('json');
 		if (!Array.isArray(body)) {

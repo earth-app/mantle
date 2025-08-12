@@ -1,8 +1,6 @@
 import type { KVNamespace } from '@cloudflare/workers-types';
-import { com } from '@earth-app/ocean';
 import type { Context } from 'hono';
 import Bindings from '../bindings';
-import { getOwnerOfBearer } from './authentication';
 
 export interface RateLimitConfig {
 	requests: number;
@@ -15,22 +13,6 @@ export interface RateLimitResult {
 	remaining: number;
 	resetTime: number;
 	total: number;
-}
-
-/**
- * Check if a user is an administrator based on the adminMiddleware logic
- */
-async function isUserAdmin(c: Context<{ Bindings: Bindings }>): Promise<boolean> {
-	const bearerToken = c.req.header('Authorization');
-	if (!bearerToken || !bearerToken.startsWith('Bearer ')) return false;
-
-	const token = bearerToken.slice(7);
-	if (token.length !== com.earthapp.util.API_KEY_LENGTH) return false;
-
-	if (token === c.env.ADMIN_API_KEY) return true;
-
-	const owner = await getOwnerOfBearer(c);
-	return owner?.account.isAdmin || false;
 }
 
 /**

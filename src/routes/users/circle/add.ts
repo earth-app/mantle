@@ -8,7 +8,6 @@ import * as tags from '../../../openapi/tags';
 // Implementation
 import { com } from '@earth-app/ocean';
 import Bindings from '../../../bindings';
-import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getAuthenticatedUserFromContext, getUserById, updateUser } from '../../../util/routes/users';
 
 const addUserCircle = new Hono<{ Bindings: Bindings }>();
@@ -46,7 +45,6 @@ addUserCircle.put(
 		},
 		tags: [tags.USERS, tags.USER_FRIENDS]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const userId = c.req.query('userId');
 		if (!userId || userId.length !== com.earthapp.util.ID_LENGTH) {

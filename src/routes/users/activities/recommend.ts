@@ -9,7 +9,6 @@ import * as tags from '../../../openapi/tags';
 import { com, kotlin } from '@earth-app/ocean';
 import Bindings from '../../../bindings';
 import { toActivity } from '../../../types/activities';
-import { bearerAuthMiddleware } from '../../../util/authentication';
 import { getRandomActivities } from '../../../util/routes/activities';
 import { getAuthenticatedUserFromContext } from '../../../util/routes/users';
 
@@ -53,7 +52,6 @@ recommendActivities.get(
 		},
 		tags: [tags.USERS, tags.ACTIVITIES]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const poolLimit = Number(c.req.query('poolLimit') || 25);
 		if (isNaN(poolLimit)) {

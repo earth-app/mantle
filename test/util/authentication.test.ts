@@ -93,7 +93,6 @@ describe('Authentication Utilities', () => {
 		it('should export middleware functions', async () => {
 			const auth = await import('../../src/util/authentication');
 
-			expect(typeof auth.bearerAuthMiddleware).toBe('function');
 			expect(typeof auth.adminMiddleware).toBe('function');
 			expect(typeof auth.basicAuthMiddleware).toBe('function');
 		});

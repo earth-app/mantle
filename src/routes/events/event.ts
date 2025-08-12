@@ -10,7 +10,7 @@ import * as tags from '../../openapi/tags';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { Event } from '../../types/events';
-import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
+import { checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
 import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
 import * as events from '../../util/routes/events';
@@ -151,7 +151,6 @@ event.patch(
 		},
 		tags: [tags.EVENTS]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const id = c.req.param('eventId');
 		if (!id) {
@@ -256,7 +255,6 @@ event.delete(
 		},
 		tags: [tags.EVENTS]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const id = c.req.param('eventId');
 		if (!id) {

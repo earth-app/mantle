@@ -14,7 +14,6 @@ import user from './user';
 
 // Implementation
 import Bindings from '../../bindings';
-import { bearerAuthMiddleware } from '../../util/authentication';
 import { getUsers, getUsersCount } from '../../util/routes/users';
 import { paginatedParameters } from '../../util/util';
 
@@ -63,7 +62,6 @@ users.get(
 users.route('/login', loginUser);
 users.route('/create', createUser);
 
-users.use('/current', bearerAuthMiddleware());
 users.get(
 	'/current',
 	describeRoute({

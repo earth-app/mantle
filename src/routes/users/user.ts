@@ -17,7 +17,7 @@ import userFriends from './friends';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { ValidationError } from '../../types/errors';
-import { adminMiddleware, bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
+import { adminMiddleware, checkVisibility } from '../../util/authentication';
 import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
 import * as users from '../../util/routes/users';
@@ -57,7 +57,6 @@ user.patch(
 	'/',
 	ipRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
-	bearerAuthMiddleware(),
 	validateMiddleware('json', schemas.userUpdate),
 	async (c) => {
 		let data = c.req.valid('json');
@@ -82,7 +81,7 @@ user.patch(
 );
 
 // Delete User
-user.delete('/', bearerAuthMiddleware(), async (c) => {
+user.delete('/', async (c) => {
 	const res = await users.getAuthenticatedUserFromContext(c);
 	if (!res.data) {
 		return c.json(
@@ -141,7 +140,6 @@ user.patch(
 		},
 		tags: [tags.USERS]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const data = c.req.valid('json');
 
@@ -249,7 +247,6 @@ user.put(
 	}),
 	ipRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
-	bearerAuthMiddleware(),
 	async (c) => {
 		const res = await users.getAuthenticatedUserFromContext(c);
 		if (!res.data) {

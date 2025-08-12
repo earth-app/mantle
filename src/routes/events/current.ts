@@ -7,7 +7,7 @@ import * as tags from '../../openapi/tags';
 
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
-import { bearerAuthMiddleware, getOwnerOfBearer } from '../../util/authentication';
+import { getOwnerOfBearer } from '../../util/authentication';
 import { getEventById, getEventsByAttendees, updateEvent } from '../../util/routes/events';
 import { paginatedParameters } from '../../util/util';
 
@@ -37,7 +37,6 @@ currentEvent.get(
 		},
 		tags: [tags.EVENTS]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const params = paginatedParameters(c);
 		if (params.code && params.message) {

@@ -11,8 +11,7 @@ import removeUserFriend from './remove';
 
 // Implementation
 import Bindings from '../../../bindings';
-import { bearerAuthMiddleware } from '../../../util/authentication';
-import { getUserById, getUserFromContext } from '../../../util/routes/users';
+import * as users from '../../../util/routes/users';
 import { paginatedParameters } from '../../../util/util';
 
 const userFriends = new Hono<{ Bindings: Bindings }>();
@@ -40,7 +39,6 @@ userFriends.get(
 		},
 		tags: [tags.USERS, tags.USER_FRIENDS]
 	}),
-	bearerAuthMiddleware(),
 	async (c) => {
 		const params = paginatedParameters(c);
 		if (params.code && params.message) {
@@ -49,7 +47,7 @@ userFriends.get(
 
 		const { page, limit, search } = params;
 
-		const res = await getUserFromContext(c);
+		const res = await users.getUserFromContext(c);
 		if (!res.data) {
 			return c.json(
 				{
@@ -66,7 +64,7 @@ userFriends.get(
 			friendIds
 				.filter((_, index) => index + 1 > (page - 1) * limit && index < page * limit)
 				.map(async (id) => {
-					const friend = await getUserById(id, c.env);
+					const friend = await users.getUserById(id, c.env);
 
 					if (friend) {
 						return friend.public;
