@@ -44,6 +44,7 @@ export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): Co
 export let collegeDB: CollegeDBConfig;
 
 export async function init(bindings: Bindings) {
+	if (collegeDB) return;
 	collegeDB = collegeDBConfig(bindings);
 	await initializeAsync(collegeDB);
 }

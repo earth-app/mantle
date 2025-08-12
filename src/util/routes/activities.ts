@@ -206,10 +206,11 @@ export async function doesActivityExist(id: string, bindings: Bindings): Promise
 	await init(bindings);
 
 	const query = `SELECT COUNT(*) as count FROM activities WHERE id = ? LIMIT 1`;
-	const result = await firstAllShards<{ count: number }>(query, [id]);
+	const result = await first<{ count: number }>(id.trim().toLowerCase(), query, [id]);
+
 	if (!result) return false;
 
-	return result.filter((row) => row != null).reduce((sum, row) => sum + row.count, 0) > 0;
+	return result.count > 0;
 }
 
 export async function getActivityById(id: string, bindings: Bindings): Promise<ActivityObject | null> {

@@ -82,7 +82,7 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 
 	const id = crypto.randomUUID();
 	const query = `INSERT INTO tokens (id, owner, token, encryption_key, encryption_iv, token_hash, lookup_hash, salt, is_session, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-	await run(id.toString(), query, [
+	await run(id, query, [
 		id,
 		owner,
 		encryptedToken,
@@ -97,7 +97,7 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 	]);
 
 	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
-	const shard = await mapper.getShardMapping(id.toString());
+	const shard = await mapper.getShardMapping(id);
 	if (!shard) throw new DBError(`No shard found for ID ${id}`);
 	await mapper.setShardMapping(lookupHash, shard.shard, [`token-${lookupHash}`]);
 }
@@ -121,6 +121,7 @@ export async function removeToken(token: string, bindings: Bindings) {
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 		await mapper.deleteShardMapping(row.id);
+		await mapper.deleteShardMapping(`token-${lookupHash}`);
 	}
 }
 
@@ -128,9 +129,7 @@ export async function isValidToken(token: string, bindings: Bindings) {
 	await init(bindings);
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
-	const row = (await firstAllShards<TokenRow>(`SELECT * FROM tokens WHERE lookup_hash = ? LIMIT 1`, [lookupHash])).filter(
-		(r) => r != null
-	)[0];
+	const row = await first<TokenRow>(`token-${lookupHash}`, `SELECT * FROM tokens WHERE lookup_hash = ? LIMIT 1`, [lookupHash]);
 
 	if (!row) return false;
 

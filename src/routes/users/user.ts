@@ -95,7 +95,7 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 	}
 	const user = res.data;
 
-	const result = await users.deleteUser(user.account.id, c.env);
+	const result = await users.deleteUser(user.account.id, user.account.username, c.env);
 	if (!result) {
 		return c.json(
 			{

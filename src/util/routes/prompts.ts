@@ -92,6 +92,8 @@ export async function healthCheck(bindings: Bindings) {
 		console.error(`Prompts Health check failed: ${error}`);
 		return false;
 	}
+
+	return true;
 }
 
 async function findPrompt(id: string, query: string, bindings: Bindings, ...params: any[]): Promise<Prompt[]> {
@@ -137,7 +139,7 @@ export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Pr
 	await init(bindings);
 
 	try {
-		const result = await run(prompt.id.toString(), `INSERT INTO prompts (id, prompt, visibility, owner_id) VALUES (?, ?, ?, ?)`, [
+		const result = await run(prompt.id, `INSERT INTO prompts (id, prompt, visibility, owner_id) VALUES (?, ?, ?, ?)`, [
 			prompt.id,
 			prompt.prompt,
 			prompt.visibility,
@@ -203,7 +205,7 @@ export async function deletePrompt(id: string, bindings: Bindings): Promise<void
 		await clearCache(cacheKey, bindings.KV_CACHE);
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
-		mapper.deleteShardMapping(id.toString());
+		mapper.deleteShardMapping(id);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to delete prompt: ${error}` });
 	}
@@ -325,7 +327,7 @@ export async function getPromptById(id: string, bindings: Bindings): Promise<Pro
 
 	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
 		const query = `SELECT * FROM prompts WHERE id = ?`;
-		const prompts = await findPrompt(id.toString(), query, bindings, id);
+		const prompts = await findPrompt(id, query, bindings, id);
 		return prompts.length > 0 ? prompts[0] : null;
 	});
 }

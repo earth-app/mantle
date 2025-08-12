@@ -12,6 +12,7 @@ import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 import { DBError, ValidationError } from '../../types/errors';
 import { collegeDB, init } from '../collegedb';
+import * as cache from './cache';
 
 // Helpers
 
@@ -95,7 +96,7 @@ export async function healthCheck(bindings: Bindings) {
             encryption_key TEXT NOT NULL,
             encryption_iv TEXT NOT NULL,
             last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id);
@@ -440,11 +441,11 @@ export async function getUsersCount(bindings: Bindings, search: string = ''): Pr
 export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {
 	await init(bindings);
 	const query = `SELECT COUNT(*) as count FROM users WHERE username = ?`;
-	const result = await firstAllShards<{ count: number }>(query, [username]);
+	const result = await first<{ count: number }>(`username:${username}`, query, [username]);
 
-	if (!result || result.length === 0) return false;
+	if (!result) return false;
 
-	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0) > 0;
+	return result.count > 0;
 }
 
 export async function getUserById(
@@ -539,13 +540,14 @@ export async function patchUser(userObject: UserObject, bindings: Bindings, data
 	return userObject.public;
 }
 
-export async function deleteUser(id: string, bindings: Bindings): Promise<boolean> {
+export async function deleteUser(id: string, username: string, bindings: Bindings): Promise<boolean> {
 	await init(bindings);
 
 	const result = await run(id, `DELETE FROM users WHERE id = ?`);
 
 	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 	mapper.deleteShardMapping(id);
+	mapper.deleteShardMapping(`username:${username}`);
 
 	return result.success;
 }
@@ -607,13 +609,17 @@ export async function generateProfilePhoto(user: User, ai: Ai): Promise<Uint8Arr
 }
 
 export async function getProfilePhoto(user: User, bindings: Bindings): Promise<Uint8Array> {
-	const profileImage = `users/${user.id}/profile.png`;
+	const cacheKey = `user:${user.id}:profile_photo`;
 
-	if (await bindings.R2.head(profileImage)) {
-		return (await bindings.R2.get(profileImage))!.bytes();
-	}
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		const profileImage = `users/${user.id}/profile.png`;
 
-	return (await bindings.ASSETS.fetch('https://assets.local/favicon.png'))!.bytes();
+		if (await bindings.R2.head(profileImage)) {
+			return (await bindings.R2.get(profileImage))!.bytes();
+		}
+
+		return (await bindings.ASSETS.fetch('https://assets.local/favicon.png'))!.bytes();
+	});
 }
 
 export async function newProfilePhoto(user: User, bindings: Bindings) {
@@ -625,6 +631,9 @@ export async function newProfilePhoto(user: User, bindings: Bindings) {
 
 	const profile = await generateProfilePhoto(user, bindings.AI);
 	await bindings.R2.put(profileImage, profile);
+
+	const cacheKey = `user:${user.id}:profile_photo`;
+	await cache.cache(cacheKey, profile, bindings.KV_CACHE);
 
 	return profile;
 }
