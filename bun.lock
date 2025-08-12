@@ -5,7 +5,7 @@
       "name": "mantle",
       "dependencies": {
         "@cloudflare/workers-types": "^4.20250810.0",
-        "@earth-app/collegedb": "^1.0.4",
+        "@earth-app/collegedb": "^1.0.5",
         "@earth-app/ocean": "1.0.0-3f0c7fa",
         "@hono-rate-limiter/cloudflare": "^0.2.2",
         "@hono/swagger-ui": "^0.5.2",
@@ -66,7 +66,7 @@
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
 
-    "@earth-app/collegedb": ["@earth-app/collegedb@1.0.5", "https://npm.pkg.github.com/download/@earth-app/collegedb/1.0.5/b964ab23eb1f5f0b0231ece0f4b7fa39af7bedfe", { "dependencies": { "@cloudflare/workers-types": "^4.20250726.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-COUU0/S4Lel++PPkX5fzqScGkkVrDwcdAow/9MlkkOAEtpGhG89oS+807tOJIYLSBOz9G7NKi1QwMWWg89nEfA=="],
+    "@earth-app/collegedb": ["@earth-app/collegedb@1.0.6", "https://npm.pkg.github.com/download/@earth-app/collegedb/1.0.6/4d7d23a4f013ba8b7ffc3b9a091850cb768358b9", { "dependencies": { "@cloudflare/workers-types": "^4.20250726.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-STTh7NUXuxSC1/ueVvx/MtGkpJ2mN3amXSETwOiOS7PbJQ3H1PR0JO6IuJ/yQxjK3F02+VL+h3k3EPQh5hauKg=="],
 
     "@earth-app/ocean": ["@earth-app/ocean@1.0.0-3f0c7fa", "https://npm.pkg.github.com/download/@earth-app/ocean/1.0.0-3f0c7fa/205a33f51b6cfb3f8c0751242ea3255c6f9f97d9", { "dependencies": { "rss-parser": "^3.13.0", "ws": "8.18.0" } }, "sha512-C/FlRAnbqT1wkFT+9SrUilzGvGK3ukXSFKmeZ+NcxLRoZvrn7e1SFBgnc6m6RSiYc3hYCwiAIITMHN91idcNxQ=="],
 
