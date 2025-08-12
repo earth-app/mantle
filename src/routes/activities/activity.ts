@@ -237,7 +237,18 @@ activity.delete(
 			);
 		}
 
-		const result = await activities.deleteActivity(id, c.env);
+		const activity = await activities.getActivityById(id, c.env);
+		if (!activity) {
+			return c.json(
+				{
+					code: 404,
+					message: `Activity with ID ${id} not found`
+				},
+				404
+			);
+		}
+
+		const result = await activities.deleteActivity(id, activity.public.aliases || [], c.env);
 		if (!result) {
 			return c.json(
 				{

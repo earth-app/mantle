@@ -125,13 +125,13 @@ export async function updateActivity(obj: ActivityObject, bindings: Bindings): P
 		throw new DBError(`Failed to convert updated activity with ID ${obj.activity.id} to ActivityObject`);
 	}
 
-	cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
+	await cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
 	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
 
 	return updatedActivity;
 }
 
-export async function deleteActivity(id: string, bindings: Bindings): Promise<boolean> {
+export async function deleteActivity(id: string, aliases: string[], bindings: Bindings): Promise<boolean> {
 	await init(bindings);
 
 	const id0 = id.trim().toLowerCase();
@@ -143,8 +143,13 @@ export async function deleteActivity(id: string, bindings: Bindings): Promise<bo
 	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 	mapper.deleteShardMapping(id0);
 
-	cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
+	await cache.clearCache(`activity:${id0}`, bindings.KV_CACHE);
 	cache.clearCachePrefix(`activities:`, bindings.KV_CACHE);
+
+	for (const alias of aliases) {
+		const alias0 = alias.trim().toLowerCase();
+		await cache.clearCache(`activity:${alias0}`, bindings.KV_CACHE);
+	}
 
 	return true;
 }
@@ -203,12 +208,13 @@ export async function getRandomActivities(bindings: Bindings, limit: number = 25
 }
 
 export async function doesActivityExist(id: string, bindings: Bindings): Promise<boolean> {
-	if (await cache.checkCacheExists(`activity:${id.trim().toLowerCase()}`, bindings.KV_CACHE)) return true;
+	const id0 = id.trim().toLowerCase();
+	if (!id0) throw new ValidationError('Activity ID cannot be empty');
 
 	await init(bindings);
 
 	const query = `SELECT COUNT(*) as count FROM activities WHERE id = ? LIMIT 1`;
-	const result = await first<{ count: number }>(id.trim().toLowerCase(), query, [id]);
+	const result = await first<{ count: number }>(id0, query, [id0]);
 
 	if (!result) return false;
 
@@ -217,14 +223,15 @@ export async function doesActivityExist(id: string, bindings: Bindings): Promise
 
 export async function getActivityById(id: string, bindings: Bindings): Promise<ActivityObject | null> {
 	if (!id) throw new ValidationError('Activity ID is required');
-	const cacheKey = `activity:${id.trim().toLowerCase()}`;
+	const id0 = id.trim().toLowerCase();
+	const cacheKey = `activity:${id0}`;
 
 	return toActivityObject(
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
 			await init(bindings);
 
 			const query = `SELECT * FROM activities WHERE id = ? LIMIT 1`;
-			const result = await first<DBActivity>(id.trim().toLowerCase(), query, [id]);
+			const result = await first<DBActivity>(id0, query, [id0]);
 			if (!result) return null;
 
 			return result;
