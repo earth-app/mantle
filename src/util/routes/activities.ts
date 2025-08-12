@@ -124,7 +124,7 @@ export async function updateActivity(obj: ActivityObject, bindings: Bindings): P
 	}
 
 	const cacheKey = `activity:${id0}`;
-	cache.cache(cacheKey, updatedActivity.database, bindings.KV_CACHE);
+	cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 	return updatedActivity;
 }

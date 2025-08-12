@@ -193,7 +193,7 @@ export async function updateEvent(obj: EventObject, bindings: Bindings): Promise
 	}
 
 	const cacheKey = `event:${obj.event.id}`;
-	cache.cache(cacheKey, updatedEvent.database, bindings.KV_CACHE);
+	cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 	return updatedEvent;
 }

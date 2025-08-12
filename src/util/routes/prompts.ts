@@ -4,7 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Prompt, PromptResponse } from '../../types/prompts';
 import { collegeDB, init } from '../collegedb';
-import { cache, clearCache, tryCache } from './cache';
+import * as cache from './cache';
 import { getUserById } from './users';
 
 // Helpers
@@ -179,7 +179,7 @@ export async function updatePrompt(id: string, prompt: Prompt, bindings: Binding
 		const obj = { ...prompt, id };
 
 		const cacheKey = `prompt:${id}`;
-		cache(cacheKey, obj, bindings.KV_CACHE);
+		cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 		return obj;
 	} catch (error) {
@@ -202,7 +202,7 @@ export async function deletePrompt(id: string, bindings: Bindings): Promise<void
 		}
 
 		const cacheKey = `prompt:${id}`;
-		await clearCache(cacheKey, bindings.KV_CACHE);
+		await cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 		mapper.deleteShardMapping(id);
@@ -253,7 +253,7 @@ export async function updatePromptResponse(id: string, response: PromptResponse,
 		const obj = { ...response, id };
 
 		const cacheKey = `prompt_response:${id}`;
-		cache(cacheKey, obj, bindings.KV_CACHE);
+		cache.cache(cacheKey, obj, bindings.KV_CACHE);
 
 		return obj;
 	} catch (error) {
@@ -263,7 +263,7 @@ export async function updatePromptResponse(id: string, response: PromptResponse,
 
 export async function deletePromptResponse(id: string, bindings: Bindings): Promise<void> {
 	const cacheKey = `prompt_response:${id}`;
-	await clearCache(cacheKey, bindings.KV_CACHE);
+	await cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 	await init(bindings);
 
@@ -289,7 +289,7 @@ export async function deletePromptResponse(id: string, bindings: Bindings): Prom
 
 export async function getPrompts(bindings: Bindings, limit: number = 25, page: number = 0, search: string = ''): Promise<Prompt[]> {
 	const cacheKey = `prompts:${limit}:${page}:${search.trim().toLowerCase()}`;
-	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
+	return cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
 		await init(bindings);
 
 		const offset = page * limit;
@@ -325,7 +325,7 @@ export async function getPromptsCount(bindings: Bindings, search: string = ''): 
 export async function getPromptById(id: string, bindings: Bindings): Promise<Prompt | null> {
 	const cacheKey = `prompt:${id}`;
 
-	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
+	return cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
 		const query = `SELECT * FROM prompts WHERE id = ?`;
 		const prompts = await findPrompt(id, query, bindings, id);
 		return prompts.length > 0 ? prompts[0] : null;
