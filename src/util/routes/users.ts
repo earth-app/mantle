@@ -6,13 +6,12 @@ import { addSession, getOwnerOfBearer, getOwnerOfToken } from '../authentication
 import * as encryption from '../encryption';
 import * as util from '../util';
 
-import { all, allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
+import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 import { DBError, ValidationError } from '../../types/errors';
 import { collegeDB, init } from '../collegedb';
-import * as cache from './cache';
 
 // Helpers
 
@@ -198,13 +197,6 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
 
 	return user;
-}
-
-async function findUser(id: string, query: string, fieldPrivacy: com.earthapp.account.Privacy, bindings: Bindings, ...params: any[]) {
-	await init(bindings);
-	const result = await all<DBUser>(id, query, params);
-
-	return await Promise.all(result.results.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
 
 // Login Function
@@ -453,8 +445,11 @@ export async function getUserById(
 	bindings: Bindings,
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ) {
-	const results = await findUser(id, 'SELECT * FROM users WHERE id = ? LIMIT 1', fieldPrivacy, bindings, id);
-	return results.length ? results[0] : null;
+	await init(bindings);
+	const result = await first<DBUser>(id, `SELECT * FROM users WHERE id = ? LIMIT 1`, [id]);
+	if (!result) return null;
+
+	return await toUserObject(result, fieldPrivacy, bindings);
 }
 
 export async function getUserByUsername(
@@ -462,14 +457,12 @@ export async function getUserByUsername(
 	bindings: Bindings,
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ) {
-	const results = await findUser(
-		`username:${username}`,
-		'SELECT * FROM users WHERE username = ? LIMIT 1',
-		fieldPrivacy,
-		bindings,
-		username
-	);
-	return results.length ? results[0] : null;
+	await init(bindings);
+	const query = `SELECT * FROM users WHERE username = ? LIMIT 1`;
+	const result = await first<DBUser>(`username:${username}`, query, [username]);
+	if (!result) return null;
+
+	return await toUserObject(result, fieldPrivacy, bindings);
 }
 
 export async function getAccountBy(
@@ -609,17 +602,13 @@ export async function generateProfilePhoto(user: User, ai: Ai): Promise<Uint8Arr
 }
 
 export async function getProfilePhoto(user: User, bindings: Bindings): Promise<Uint8Array> {
-	const cacheKey = `user:${user.id}:profile_photo`;
+	const profileImage = `users/${user.id}/profile.png`;
 
-	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		const profileImage = `users/${user.id}/profile.png`;
+	if (await bindings.R2.head(profileImage)) {
+		return (await bindings.R2.get(profileImage))!.bytes();
+	}
 
-		if (await bindings.R2.head(profileImage)) {
-			return (await bindings.R2.get(profileImage))!.bytes();
-		}
-
-		return (await bindings.ASSETS.fetch('https://assets.local/favicon.png'))!.bytes();
-	});
+	return (await bindings.ASSETS.fetch('https://assets.local/favicon.png'))!.bytes();
 }
 
 export async function newProfilePhoto(user: User, bindings: Bindings) {
@@ -631,9 +620,6 @@ export async function newProfilePhoto(user: User, bindings: Bindings) {
 
 	const profile = await generateProfilePhoto(user, bindings.AI);
 	await bindings.R2.put(profileImage, profile);
-
-	const cacheKey = `user:${user.id}:profile_photo`;
-	await cache.cache(cacheKey, profile, bindings.KV_CACHE);
 
 	return profile;
 }
