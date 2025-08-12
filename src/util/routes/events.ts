@@ -1,13 +1,13 @@
 import { Event, EventObject, toEvent } from '../../types/events';
 import { haversineDistance } from '../util';
 
-import { allAllShards, createSchemaAcrossShards, first, firstAllShards, initializeAsync, KVShardMapper, run } from '@earth-app/collegedb';
+import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { DBError, ValidationError } from '../../types/errors';
-import { collegeDBConfig } from '../collegedb';
+import { collegeDB, init } from '../collegedb';
 import * as cache from './cache';
 
 // Helpers
@@ -56,30 +56,36 @@ function toEventObject(event: DBEvent | null): EventObject | null {
 	}
 }
 
-export async function init(bindings: Bindings) {
-	const query = `CREATE TABLE IF NOT EXISTS events (
-        id TEXT PRIMARY KEY NOT NULL UNIQUE,
-        binary BLOB NOT NULL,
-        hostId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        name TEXT NOT NULL,
-		attendees TEXT NOT NULL,
-        latitude DOUBLE,
-        longitude DOUBLE,
-        date DATETIME NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_events_id ON events(id);
-	CREATE INDEX IF NOT EXISTS idx_events_hostId ON events(hostId);
-	CREATE INDEX IF NOT EXISTS idx_events_name ON events(name);
-	CREATE INDEX IF NOT EXISTS idx_events_attendees ON events(attendees);
-	CREATE INDEX IF NOT EXISTS idx_events_latitude ON events(latitude);
-	CREATE INDEX IF NOT EXISTS idx_events_longitude ON events(longitude);
-	CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);`;
+export async function healthCheck(bindings: Bindings) {
+	try {
+		await init(bindings);
+		const query = `CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY NOT NULL UNIQUE,
+            binary BLOB NOT NULL,
+            hostId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            attendees TEXT NOT NULL,
+            latitude DOUBLE,
+            longitude DOUBLE,
+            date DATETIME NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_events_id ON events(id);
+        CREATE INDEX IF NOT EXISTS idx_events_hostId ON events(hostId);
+        CREATE INDEX IF NOT EXISTS idx_events_name ON events(name);
+        CREATE INDEX IF NOT EXISTS idx_events_attendees ON events(attendees);
+        CREATE INDEX IF NOT EXISTS idx_events_latitude ON events(latitude);
+        CREATE INDEX IF NOT EXISTS idx_events_longitude ON events(longitude);
+        CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);`;
 
-	const config = collegeDBConfig(bindings);
-	await initializeAsync(config);
-	await createSchemaAcrossShards(config.shards, query);
+		await createSchemaAcrossShards(collegeDB.shards, query);
+	} catch (error) {
+		console.error(`Events Health check failed: ${error}`);
+		return false;
+	}
+
+	return true;
 }
 
 async function findEvent(query: string, bindings: Bindings, ...params: any[]): Promise<DBEvent[]> {

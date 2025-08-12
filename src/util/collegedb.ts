@@ -1,4 +1,4 @@
-import { CollegeDBConfig, D1Region } from '@earth-app/collegedb';
+import { CollegeDBConfig, D1Region, initializeAsync } from '@earth-app/collegedb';
 import Bindings from '../bindings';
 
 export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): CollegeDBConfig =>
@@ -40,3 +40,10 @@ export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): Co
 		disableAutoMigration: true,
 		debug: false
 	}) satisfies CollegeDBConfig;
+
+export let collegeDB: CollegeDBConfig;
+
+export async function init(bindings: Bindings) {
+	collegeDB = collegeDBConfig(bindings);
+	await initializeAsync(collegeDB);
+}

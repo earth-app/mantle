@@ -6,21 +6,12 @@ import { addSession, getOwnerOfBearer, getOwnerOfToken } from '../authentication
 import * as encryption from '../encryption';
 import * as util from '../util';
 
-import {
-	all,
-	allAllShards,
-	createSchemaAcrossShards,
-	first,
-	firstAllShards,
-	initializeAsync,
-	KVShardMapper,
-	run
-} from '@earth-app/collegedb';
+import { all, allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 import { DBError, ValidationError } from '../../types/errors';
-import { collegeDBConfig } from '../collegedb';
+import { collegeDB, init } from '../collegedb';
 
 // Helpers
 
@@ -92,28 +83,34 @@ async function toUserObject(row: DBUser, fieldPrivacy: com.earthapp.account.Priv
 	return { public: toUser(accountData, fieldPrivacy, row.created_at, row.updated_at, row.last_login), database: row, account: accountData };
 }
 
-export async function init(bindings: Bindings) {
-	const query = `CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY NOT NULL UNIQUE,
-        username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        salt TEXT NOT NULL,
-        binary BLOB NOT NULL,
-        encryption_key TEXT NOT NULL,
-        encryption_iv TEXT NOT NULL,
-        last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id);
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username);
-	CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC);
-	CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC);
-	CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC);`;
+export async function healthCheck(bindings: Bindings) {
+	try {
+		await init(bindings);
+		const query = `CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY NOT NULL UNIQUE,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            salt TEXT NOT NULL,
+            binary BLOB NOT NULL,
+            encryption_key TEXT NOT NULL,
+            encryption_iv TEXT NOT NULL,
+            last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_id ON users (id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username);
+        CREATE INDEX IF NOT EXISTS idx_users_last_login ON users (last_login DESC);
+        CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users (updated_at DESC);`;
 
-	const config = collegeDBConfig(bindings);
-	await initializeAsync(config);
-	await createSchemaAcrossShards(config.shards, query);
+		await createSchemaAcrossShards(collegeDB.shards, query);
+	} catch (error) {
+		console.error(`Users Health check failed: ${error}`);
+		return false;
+	}
+
+	return true;
 }
 
 // User Functions

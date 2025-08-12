@@ -1,11 +1,11 @@
-import { allAllShards, createSchemaAcrossShards, first, firstAllShards, initializeAsync, KVShardMapper, run } from '@earth-app/collegedb';
+import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com, kotlin } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Activity, ActivityObject, toActivity } from '../../types/activities';
 import { DBError, ValidationError } from '../../types/errors';
-import { collegeDBConfig } from '../collegedb';
+import { collegeDB, init } from '../collegedb';
 import * as cache from './cache';
 
 // Helpers
@@ -51,18 +51,24 @@ function toActivityObject(activity: DBActivity | null): ActivityObject | null {
 	}
 }
 
-export async function init(bindings: Bindings) {
-	const query = `CREATE TABLE IF NOT EXISTS activities (
-		id TEXT PRIMARY KEY NOT NULL UNIQUE,
-		binary BLOB NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_activities_id ON activities(id);`;
+export async function healthCheck(bindings: Bindings): Promise<boolean> {
+	try {
+		await init(bindings);
+		const query = `CREATE TABLE IF NOT EXISTS activities (
+            id TEXT PRIMARY KEY NOT NULL UNIQUE,
+            binary BLOB NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_activities_id ON activities(id);`;
 
-	const config = collegeDBConfig(bindings);
-	await initializeAsync(config);
-	await createSchemaAcrossShards(config.shards, query);
+		await createSchemaAcrossShards(collegeDB.shards, query);
+	} catch (error) {
+		console.error(`Activities Health check failed: ${error}`);
+		return false;
+	}
+
+	return true;
 }
 
 async function findActivity(query: string, bindings: Bindings, ...params: any[]): Promise<DBActivity[]> {

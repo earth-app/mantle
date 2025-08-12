@@ -1,5 +1,6 @@
 import { KVNamespace } from '@cloudflare/workers-types';
 import { com } from '@earth-app/ocean';
+import Bindings from '../../bindings';
 import { Article } from '../../types/article';
 import { DBError, ValidationError } from '../../types/errors';
 import { User } from '../../types/users';
@@ -39,6 +40,16 @@ export function newArticleObject(article: Partial<Article>, user: User): Article
 		created_at: new Date().toISOString(),
 		updated_at: new Date().toISOString()
 	};
+}
+
+export async function healthCheck(bindings: Bindings): Promise<boolean> {
+	try {
+		await bindings.KV.list<ArticleMetadata>({ prefix: 'article:', limit: 1 });
+		return true;
+	} catch (error) {
+		console.error(`Article KV health check failed: ${error}`);
+		return false;
+	}
 }
 
 // Implementation

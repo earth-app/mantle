@@ -1,9 +1,9 @@
-import { all, allAllShards, createSchemaAcrossShards, firstAllShards, initializeAsync, KVShardMapper, run } from '@earth-app/collegedb';
+import { all, allAllShards, createSchemaAcrossShards, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Prompt, PromptResponse } from '../../types/prompts';
-import { collegeDBConfig } from '../collegedb';
+import { collegeDB, init } from '../collegedb';
 import { cache, clearCache, tryCache } from './cache';
 import { getUserById } from './users';
 
@@ -57,36 +57,41 @@ export function createPromptResponse(promptId: string, response: string, ownerId
 
 // Database
 
-export async function init(bindings: Bindings) {
-	const query = `CREATE TABLE IF NOT EXISTS prompts (
-		id TEXT PRIMARY KEY NOT NULL UNIQUE,
-		prompt TEXT NOT NULL,
-		owner_id TEXT NOT NULL,
-		visibility TEXT NOT NULL DEFAULT 'PUBLIC',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE INDEX IF NOT EXISTS idx_prompts_owner_id ON prompts(owner_id);
-	CREATE INDEX IF NOT EXISTS idx_prompts_prompt ON prompts(prompt);
-	CREATE INDEX IF NOT EXISTS idx_prompts_visibility ON prompts(visibility);
+export async function healthCheck(bindings: Bindings) {
+	try {
+		await init(bindings);
 
-	CREATE TABLE IF NOT EXISTS prompt_responses (
-		id TEXT PRIMARY KEY NOT NULL UNIQUE,
-		prompt_id TEXT NOT NULL,
-		owner_id TEXT NOT NULL,
-		response TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (prompt_id) REFERENCES prompts(id)
-	);
-	CREATE INDEX IF NOT EXISTS idx_prompt_responses_prompt_id ON prompt_responses(prompt_id);
-	CREATE INDEX IF NOT EXISTS idx_prompt_responses_owner_id ON prompt_responses(owner_id);
-	CREATE INDEX IF NOT EXISTS idx_prompt_responses_response ON prompt_responses(response);
-	CREATE INDEX IF NOT EXISTS idx_prompt_responses_created_at ON prompt_responses(created_at);`;
+		const query = `CREATE TABLE IF NOT EXISTS prompts (
+            id TEXT PRIMARY KEY NOT NULL UNIQUE,
+            prompt TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            visibility TEXT NOT NULL DEFAULT 'PUBLIC',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_prompts_owner_id ON prompts(owner_id);
+        CREATE INDEX IF NOT EXISTS idx_prompts_prompt ON prompts(prompt);
+        CREATE INDEX IF NOT EXISTS idx_prompts_visibility ON prompts(visibility);
 
-	const config = collegeDBConfig(bindings);
-	await initializeAsync(config);
-	await createSchemaAcrossShards(config.shards, query);
+        CREATE TABLE IF NOT EXISTS prompt_responses (
+            id TEXT PRIMARY KEY NOT NULL UNIQUE,
+            prompt_id TEXT NOT NULL,
+            owner_id TEXT NOT NULL,
+            response TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (prompt_id) REFERENCES prompts(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_prompt_responses_prompt_id ON prompt_responses(prompt_id);
+        CREATE INDEX IF NOT EXISTS idx_prompt_responses_owner_id ON prompt_responses(owner_id);
+        CREATE INDEX IF NOT EXISTS idx_prompt_responses_response ON prompt_responses(response);
+        CREATE INDEX IF NOT EXISTS idx_prompt_responses_created_at ON prompt_responses(created_at);`;
+
+		await createSchemaAcrossShards(collegeDB.shards, query);
+	} catch (error) {
+		console.error(`Prompts Health check failed: ${error}`);
+		return false;
+	}
 }
 
 async function findPrompt(id: string, query: string, bindings: Bindings, ...params: any[]): Promise<Prompt[]> {

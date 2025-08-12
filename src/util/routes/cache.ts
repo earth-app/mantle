@@ -1,4 +1,5 @@
 import { KVNamespace } from '@cloudflare/workers-types';
+import Bindings from '../../bindings';
 import { ValidationError } from '../../types/errors';
 
 const CACHE_TTL = 60 * 60 * 4000; // 4 hours in milliseconds
@@ -14,6 +15,16 @@ export async function cache(id: string, value: any, kv: KVNamespace) {
 		return val;
 	});
 	return kv.put(id, serializedValue, { metadata: { date: Date.now() } });
+}
+
+export async function healthCheck(bindings: Bindings): Promise<boolean> {
+	try {
+		await bindings.KV_CACHE.list({ prefix: 'cache:', limit: 1 });
+		return true;
+	} catch (error) {
+		console.error(`Cache KV health check failed: ${error}`);
+		return false;
+	}
 }
 
 export async function getCache<T>(id: string, kv: KVNamespace): Promise<[T, number] | null> {
