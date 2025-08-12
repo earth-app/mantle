@@ -92,52 +92,10 @@ export async function checkKVRateLimit(kv: KVNamespace, config: RateLimitConfig,
  */
 export function ipRateLimit(config: RateLimitConfig) {
 	return async (c: Context<{ Bindings: Bindings }>, next: () => Promise<void>) => {
-		// Skip rate limiting for administrators
-		const isAdmin = await isUserAdmin(c);
-		if (isAdmin) return next();
-
 		// Use IP address as identifier, fallback to 'anonymous'
 		const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() || 'anonymous';
 
 		const result = await checkKVRateLimit(c.env.KV, config, ip);
-
-		// Add rate limit headers
-		c.res.headers.set('X-RateLimit-Limit', config.requests.toString());
-		c.res.headers.set('X-RateLimit-Remaining', result.remaining.toString());
-		c.res.headers.set('X-RateLimit-Reset', Math.ceil(result.resetTime / 1000).toString());
-
-		if (!result.allowed) {
-			return c.json(
-				{
-					error: 'Rate limit exceeded',
-					message: `Too many requests. Limit: ${config.requests} requests per ${config.windowMs / 1000} seconds.`,
-					retryAfter: Math.ceil((result.resetTime - Date.now()) / 1000)
-				},
-				429
-			);
-		}
-
-		return next();
-	};
-}
-
-/**
- * Create user-specific KV rate limit middleware (requires authentication)
- */
-export function authRateLimit(config: RateLimitConfig) {
-	return async (c: Context<{ Bindings: Bindings }>, next: () => Promise<void>) => {
-		// Skip rate limiting for administrators
-		const isAdmin = await isUserAdmin(c);
-		if (isAdmin) return next();
-
-		// Get user identifier from bearer token
-		const owner = await getOwnerOfBearer(c);
-		if (!owner) {
-			return c.json({ error: 'Authentication required for this rate-limited endpoint' }, 401);
-		}
-
-		const userId = owner.account.id;
-		const result = await checkKVRateLimit(c.env.KV, config, `user:${userId}`);
 
 		// Add rate limit headers
 		c.res.headers.set('X-RateLimit-Limit', config.requests.toString());

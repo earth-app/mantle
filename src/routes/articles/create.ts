@@ -11,7 +11,7 @@ import * as tags from '../../openapi/tags';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
-import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { newArticle, newArticleObject } from '../../util/routes/articles';
 import { validateMiddleware } from '../../util/validation';
 
@@ -19,7 +19,7 @@ const createArticle = new Hono<{ Bindings: Bindings }>();
 
 createArticle.post(
 	'/',
-	authRateLimit(rateLimitConfigs.articleCreate),
+	ipRateLimit(rateLimitConfigs.articleCreate),
 	validateMiddleware('json', schemas.articleCreate),
 	describeRoute({
 		summary: 'Create a new article',

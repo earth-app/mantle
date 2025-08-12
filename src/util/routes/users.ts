@@ -12,6 +12,7 @@ import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 import { DBError, ValidationError } from '../../types/errors';
 import { collegeDB, init } from '../collegedb';
+import * as cache from './cache';
 
 // Helpers
 
@@ -133,45 +134,40 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 	const iv = crypto.getRandomValues(new Uint8Array(12));
 	const encryptedData = await encryption.encryptData(key.rawKey, data, iv);
 
-	const exists = `SELECT COUNT(*) as count FROM users WHERE id = ?`;
-	const countResult = await first<{ count: number }>(user.id, exists, [user.id]);
-	if (!countResult) throw new DBError(`Failed to check if user '${user.id}' exists`);
-
-	let result: D1Result;
-	if (countResult.count > 0) {
-		// Update existing user
-		const updateQuery = `UPDATE users SET username = ?, password = ?, salt = ?, binary = ?, encryption_key = ?, encryption_iv = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-		result = await run(user.id, updateQuery, [
-			user.username,
-			util.toBase64(hashedPassword),
-			util.toBase64(salt),
-			encryptedData,
-			JSON.stringify(encryptedKey),
-			util.toBase64(iv),
-			user.id
-		]);
-	} else {
-		// Insert new user
-		const query = `INSERT INTO users (id, username, password, salt, binary, encryption_key, encryption_iv) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-		result = await run(user.id, query, [
-			user.id,
-			user.username,
-			util.toBase64(hashedPassword),
-			util.toBase64(salt),
-			encryptedData,
-			JSON.stringify(encryptedKey),
-			util.toBase64(iv)
-		]);
-	}
+	const query = `INSERT INTO users (id, username, password, salt, binary, encryption_key, encryption_iv) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+	const result = await run(user.id, query, [
+		user.id,
+		user.username,
+		util.toBase64(hashedPassword),
+		util.toBase64(salt),
+		encryptedData,
+		JSON.stringify(encryptedKey),
+		util.toBase64(iv)
+	]);
 
 	if (!result.success) throw new DBError(`Failed to save user '${user.id}': ${result.error}`);
 
 	const mapper = new KVShardMapper(bindings.KV);
 	const shard = await mapper.getShardMapping(user.id);
 	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.id}' after creation`);
-	mapper.setShardMapping(user.id, shard.shard, [`username:${user.username}`]);
+	await mapper.setShardMapping(user.id, shard.shard, [`username:${user.username}`]);
 
-	return await getUserById(user.id, bindings);
+	return {
+		public: toUser(user, com.earthapp.account.Privacy.PRIVATE, new Date(), new Date(), new Date()),
+		account: user,
+		database: {
+			id: user.id,
+			username: user.username,
+			password: util.toBase64(hashedPassword),
+			salt: util.toBase64(salt),
+			binary: encryptedData,
+			encryption_key: JSON.stringify(encryptedKey),
+			encryption_iv: util.toBase64(iv),
+			last_login: new Date(),
+			created_at: new Date(),
+			updated_at: new Date()
+		}
+	};
 }
 
 // Update User Function
@@ -195,6 +191,11 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 	if (!res.success) throw new DBError(`Failed to update user '${user.account.id}': ${res.error}`);
 
 	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
+
+	const mapper = new KVShardMapper(bindings.KV);
+	const shard = await mapper.getShardMapping(user.database.id);
+	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.database.id}' after update`);
+	await mapper.setShardMapping(user.database.id, shard.shard, [`username:${user.account.username}`]);
 
 	return user;
 }
@@ -431,13 +432,17 @@ export async function getUsersCount(bindings: Bindings, search: string = ''): Pr
 }
 
 export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {
-	await init(bindings);
-	const query = `SELECT COUNT(*) as count FROM users WHERE username = ?`;
-	const result = await first<{ count: number }>(`username:${username}`, query, [username]);
+	const cacheKey = `user:exists:${username}`;
 
-	if (!result) return false;
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
+		const query = `SELECT COUNT(*) as count FROM users WHERE username = ?`;
+		const result = await first<{ count: number }>(`username:${username}`, query, [username]);
 
-	return result.count > 0;
+		if (!result) return false;
+
+		return result.count > 0;
+	});
 }
 
 export async function getUserById(
@@ -505,7 +510,7 @@ export async function patchUser(userObject: UserObject, bindings: Bindings, data
 	if (data) {
 		newAccount = account.deepCopy() as com.earthapp.account.Account;
 		try {
-			if (data.username && (await doesUsernameExist(data.username, bindings)) && data.username !== account.username) {
+			if (data.username && data.username !== account.username && (await doesUsernameExist(data.username, bindings))) {
 				throw new HTTPException(400, { message: `Username "${data.username}" is already taken.` });
 			}
 
@@ -541,6 +546,9 @@ export async function deleteUser(id: string, username: string, bindings: Binding
 	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 	mapper.deleteShardMapping(id);
 	mapper.deleteShardMapping(`username:${username}`);
+
+	const cacheKey = `user:exists:${username}`;
+	cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 	return result.success;
 }

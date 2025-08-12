@@ -128,7 +128,7 @@ export async function saveEvent(event: com.earthapp.event.Event, bindings: Bindi
 	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 	const shard = await mapper.getShardMapping(event.id);
 	if (!shard) throw new DBError(`No shard found for event ID ${event.id}`);
-	mapper.setShardMapping(event.id, shard.shard, [`event-host:${event.hostId}`]);
+	await mapper.setShardMapping(event.id, shard.shard, [`event-host:${event.hostId}`]);
 
 	const newEvent = toEventObject({
 		id: event.id,

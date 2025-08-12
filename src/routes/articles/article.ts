@@ -12,7 +12,7 @@ import { validateMiddleware } from '../../util/validation';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
-import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { deleteArticle, getArticle, updateArticle } from '../../util/routes/articles';
 
 const article = new Hono<{ Bindings: Bindings }>();
@@ -72,7 +72,7 @@ article.get(
 // Update Article
 article.patch(
 	'/',
-	authRateLimit(rateLimitConfigs.articleUpdate),
+	ipRateLimit(rateLimitConfigs.articleUpdate),
 	validateMiddleware('param', schemas.id),
 	validateMiddleware('json', schemas.articleUpdate),
 	describeRoute({

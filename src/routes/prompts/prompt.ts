@@ -13,7 +13,7 @@ import { validateMiddleware } from '../../util/validation';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
-import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
 import * as prompts from '../../util/routes/prompts';
 import { paginatedParameters } from '../../util/util';
@@ -81,7 +81,7 @@ prompt.get(
 prompt.patch(
 	'/',
 	globalRateLimit(true),
-	authRateLimit(rateLimitConfigs.promptUpdate),
+	ipRateLimit(rateLimitConfigs.promptUpdate),
 	validateMiddleware('json', schemas.promptCreate),
 	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
 	describeRoute({
@@ -292,7 +292,7 @@ prompt.get(
 prompt.post(
 	'/responses',
 	globalRateLimit(true),
-	authRateLimit(rateLimitConfigs.promptResponseCreate),
+	ipRateLimit(rateLimitConfigs.promptResponseCreate),
 	validateMiddleware('json', schemas.promptResponseBody),
 	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
 	describeRoute({
@@ -445,7 +445,7 @@ prompt.get(
 prompt.patch(
 	'/responses/:responseId',
 	globalRateLimit(true),
-	authRateLimit(rateLimitConfigs.promptResponseUpdate),
+	ipRateLimit(rateLimitConfigs.promptResponseUpdate),
 	validateMiddleware('json', schemas.promptResponseBody),
 	validateMiddleware('param', z.object({ promptId: schemas.uuid, responseId: schemas.uuid })),
 	describeRoute({

@@ -11,7 +11,7 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { Event } from '../../types/events';
 import { bearerAuthMiddleware, checkVisibility, getOwnerOfBearer, getOwnerOfToken } from '../../util/authentication';
-import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
 import * as events from '../../util/routes/events';
 
@@ -100,7 +100,7 @@ event.get(
 // Update Event
 event.patch(
 	'/',
-	authRateLimit(rateLimitConfigs.eventUpdate),
+	ipRateLimit(rateLimitConfigs.eventUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	describeRoute({
 		summary: 'Update an event',

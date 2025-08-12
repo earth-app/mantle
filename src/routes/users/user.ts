@@ -18,7 +18,7 @@ import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { ValidationError } from '../../types/errors';
 import { adminMiddleware, bearerAuthMiddleware, checkVisibility } from '../../util/authentication';
-import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { globalRateLimit } from '../../util/ratelimit';
 import * as users from '../../util/routes/users';
 
@@ -55,7 +55,7 @@ user.get('/', async (c) => {
 // Patch User
 user.patch(
 	'/',
-	authRateLimit(rateLimitConfigs.userUpdate),
+	ipRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
 	validateMiddleware('json', schemas.userUpdate),
@@ -112,7 +112,7 @@ user.delete('/', bearerAuthMiddleware(), async (c) => {
 // Change Field Privacy
 user.patch(
 	'/field_privacy',
-	authRateLimit(rateLimitConfigs.userUpdate),
+	ipRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	validateMiddleware('json', schemas.userFieldPrivacy),
 	describeRoute({
@@ -247,7 +247,7 @@ user.put(
 		},
 		tags: [tags.USERS]
 	}),
-	authRateLimit(rateLimitConfigs.userUpdate),
+	ipRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	bearerAuthMiddleware(),
 	async (c) => {
@@ -308,7 +308,7 @@ user.put(
 		},
 		tags: [tags.USERS]
 	}),
-	authRateLimit(rateLimitConfigs.userUpdate),
+	ipRateLimit(rateLimitConfigs.userUpdate),
 	globalRateLimit(true), // Authenticated rate limiting
 	adminMiddleware(),
 	async (c) => {

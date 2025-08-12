@@ -6,7 +6,7 @@ import { createMockContext, MOCK_ADMIN_TOKEN, MOCK_USER_TOKEN } from '../helpers
 const {
 	checkKVRateLimit,
 	ipRateLimit: kvRateLimit,
-	authRateLimit: kvUserRateLimit,
+	ipRateLimit: kvUserRateLimit,
 	rateLimitConfigs
 } = await import('../../src/util/kv-ratelimit');
 

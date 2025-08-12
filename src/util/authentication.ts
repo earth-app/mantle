@@ -10,6 +10,7 @@ import Bindings from '../bindings';
 import { DBError, ValidationError } from '../types/errors';
 import { collegeDBConfig } from './collegedb';
 import * as encryption from './encryption';
+import * as cache from './routes/cache';
 import { ADMIN_USER_OBJECT, getUserById, getUserByUsername } from './routes/users';
 import * as util from './util';
 
@@ -107,8 +108,8 @@ export async function removeToken(token: string, bindings: Bindings) {
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
 
-	const query = 'SELECT id, salt, token_hash FROM tokens WHERE lookup_hash = ?';
-	const row = await first<{ id: string; salt: string; token_hash: string }>(`token-${lookupHash}`, query, [lookupHash]);
+	const query = 'SELECT id, salt, token_hash, owner FROM tokens WHERE lookup_hash = ?';
+	const row = await first<{ id: string; salt: string; token_hash: string; owner: string }>(`token-${lookupHash}`, query, [lookupHash]);
 
 	if (!row) return;
 
@@ -122,6 +123,8 @@ export async function removeToken(token: string, bindings: Bindings) {
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 		await mapper.deleteShardMapping(row.id);
 		await mapper.deleteShardMapping(`token-${lookupHash}`);
+
+		cache.clearCache(`session-count:${row.owner}`, bindings.KV_CACHE);
 	}
 }
 
@@ -158,12 +161,15 @@ export async function isValidToken(token: string, bindings: Bindings) {
 export async function getTokenCount(owner: string, bindings: Bindings) {
 	if (!owner) throw new ValidationError('Owner is required');
 
-	await init(bindings);
+	const cacheKey = `token-count:${owner}`;
 
-	const query = 'SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = FALSE';
-	const result = await firstAllShards<{ count: number }>(query, [owner]);
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
+		const query = 'SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = FALSE';
+		const result = await firstAllShards<{ count: number }>(query, [owner]);
 
-	return result.filter((r) => r != null).reduce((sum, r) => sum + r.count, 0);
+		return result.filter((r) => r != null).reduce((sum, r) => sum + r.count, 0);
+	});
 }
 
 export async function getOwnerOfToken(token: string, bindings: Bindings) {
@@ -171,7 +177,6 @@ export async function getOwnerOfToken(token: string, bindings: Bindings) {
 	if (token === bindings.ADMIN_API_KEY) return ADMIN_USER_OBJECT;
 
 	await init(bindings);
-
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
 	const query = 'SELECT owner FROM tokens WHERE lookup_hash = ?';
 	const row = await first<{ owner: string }>(`token-${lookupHash}`, query, [lookupHash]);
@@ -266,12 +271,16 @@ export async function isValidSession(session: string, bindings: Bindings) {
 
 export async function getSessionCount(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
-	await init(bindings);
 
-	const query = `SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = TRUE`;
-	const results = await firstAllShards<{ count: number }>(query, [owner]).then((rows) => rows.filter((r) => r != null));
+	const cacheKey = `session-count:${owner}`;
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
 
-	return results.reduce((sum, row) => sum + row.count, 0);
+		const query = `SELECT COUNT(*) as count FROM tokens WHERE owner = ? AND expires_at > CURRENT_TIMESTAMP AND is_session = TRUE`;
+		const results = await firstAllShards<{ count: number }>(query, [owner]).then((rows) => rows.filter((r) => r != null));
+
+		return results.reduce((sum, row) => sum + row.count, 0);
+	});
 }
 
 export async function bumpCurrentSession(owner: string, bindings: Bindings) {

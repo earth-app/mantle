@@ -12,14 +12,14 @@ import { validateMiddleware } from '../../util/validation';
 import { com } from '@earth-app/ocean';
 import Bindings from '../../bindings';
 import { getOwnerOfBearer, typeMiddleware } from '../../util/authentication';
-import { authRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import * as prompts from '../../util/routes/prompts';
 
 const createPrompt = new Hono<{ Bindings: Bindings }>();
 
 createPrompt.post(
 	'/',
-	authRateLimit(rateLimitConfigs.promptCreate),
+	ipRateLimit(rateLimitConfigs.promptCreate),
 	validateMiddleware('json', schemas.promptCreate),
 	describeRoute({
 		summary: 'Create a new prompt',
