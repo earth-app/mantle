@@ -174,14 +174,24 @@ export const userUpdate = z
 		username: username.optional(),
 		email: email.optional(),
 		firstName: z.string().min(1).max(30).optional(),
-		lastName: z.string().min(1).max(30).optional()
+		lastName: z.string().min(1).max(30).optional(),
+		address: z.string().max(100).optional(),
+		bio: z.string().max(500).optional(),
+		country: z.string().min(2).max(2).optional(),
+		phoneNumber: z.number().int().max(9999999999).optional(),
+		visibility: visibility.optional()
 	})
 	.openapi({
 		example: {
 			username: 'johndoe',
 			email: 'new@email.com',
 			firstName: 'John',
-			lastName: 'Doe'
+			lastName: 'Doe',
+			address: '123 Main St, Springfield, USA',
+			bio: 'Avid hiker and outdoor enthusiast.',
+			country: 'US',
+			phoneNumber: 1234567890,
+			visibility: 'PUBLIC'
 		}
 	});
 
