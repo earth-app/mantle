@@ -1,7 +1,7 @@
 import { com } from '@earth-app/ocean';
 
 export type Prompt = {
-	id: bigint;
+	id: string;
 	owner_id: string;
 	prompt: string;
 	visibility: typeof com.earthapp.account.Privacy.prototype.name;
@@ -10,8 +10,8 @@ export type Prompt = {
 };
 
 export type PromptResponse = {
-	id: bigint;
-	prompt_id: bigint;
+	id: string;
+	prompt_id: string;
 	owner_id?: string;
 	response: string;
 	created_at: Date;

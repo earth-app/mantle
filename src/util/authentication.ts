@@ -14,7 +14,7 @@ import { ADMIN_USER_OBJECT, getUserById, getUserByUsername } from './routes/user
 import * as util from './util';
 
 type TokenRow = {
-	id: bigint;
+	id: string;
 	owner: string;
 	token: Uint8Array;
 	encryption_key: string;
@@ -28,7 +28,7 @@ type TokenRow = {
 
 export async function init(bindings: Bindings) {
 	const query = `CREATE TABLE IF NOT EXISTS tokens (
-        id INTEGER PRIMARY KEY NOT NULL UNIQUE,
+        id TEXT PRIMARY KEY NOT NULL UNIQUE,
         owner TEXT NOT NULL,
         token BLOB NOT NULL,
         encryption_key TEXT NOT NULL,
@@ -80,7 +80,7 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
 
-	const id = util.randomUint64();
+	const id = crypto.randomUUID();
 	const query = `INSERT INTO tokens (id, owner, token, encryption_key, encryption_iv, token_hash, lookup_hash, salt, is_session, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 	await run(id.toString(), query, [
 		id,
@@ -108,7 +108,7 @@ export async function removeToken(token: string, bindings: Bindings) {
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
 
 	const query = 'SELECT id, salt, token_hash FROM tokens WHERE lookup_hash = ?';
-	const row = await first<{ id: number; salt: string; token_hash: string }>(`token-${lookupHash}`, query, [lookupHash]);
+	const row = await first<{ id: string; salt: string; token_hash: string }>(`token-${lookupHash}`, query, [lookupHash]);
 
 	if (!row) return;
 
@@ -117,10 +117,10 @@ export async function removeToken(token: string, bindings: Bindings) {
 
 	if (tokenHash === row.token_hash) {
 		const deleteQuery = 'DELETE FROM tokens WHERE id = ?';
-		await run(row.id.toString(), deleteQuery, [row.id]);
+		await run(row.id, deleteQuery, [row.id]);
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
-		await mapper.deleteShardMapping(row.id.toString());
+		await mapper.deleteShardMapping(row.id);
 	}
 }
 
@@ -197,7 +197,7 @@ export async function validateSessions(owner: string, bindings: Bindings) {
 	const sessionCount = await getSessionCount(owner, bindings);
 	if (sessionCount >= 3) {
 		const query = `SELECT id FROM tokens WHERE owner = ? AND is_session = TRUE ORDER BY created_at DESC LIMIT 1 OFFSET 2`;
-		const results = await firstAllShards<{ id: number }>(query, [owner]).then((rows) => rows.filter((r) => r != null));
+		const results = await firstAllShards<{ id: string }>(query, [owner]).then((rows) => rows.filter((r) => r != null));
 
 		if (results.length > 0) {
 			const idsToDelete = results.map((row) => row.id);

@@ -4,7 +4,6 @@ import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Prompt, PromptResponse } from '../../types/prompts';
 import { collegeDBConfig } from '../collegedb';
-import { randomUint64 } from '../util';
 import { cache, clearCache, tryCache } from './cache';
 import { getUserById } from './users';
 
@@ -19,7 +18,7 @@ export function createPrompt(prompt: string, visibility: string, owner: string):
 		const privacy = com.earthapp.account.Privacy.valueOf(visibility || 'PUBLIC');
 
 		return {
-			id: randomUint64(),
+			id: crypto.randomUUID(),
 			owner_id: owner,
 			prompt,
 			visibility: privacy.name,
@@ -33,14 +32,14 @@ export function createPrompt(prompt: string, visibility: string, owner: string):
 	}
 }
 
-export function createPromptResponse(promptId: bigint, response: string, ownerId?: string): PromptResponse {
+export function createPromptResponse(promptId: string, response: string, ownerId?: string): PromptResponse {
 	try {
 		if (!response || typeof response !== 'string' || response.trim() === '') {
 			throw new HTTPException(400, { message: 'Response is required and must be a non-empty string.' });
 		}
 
 		return {
-			id: randomUint64(),
+			id: crypto.randomUUID(),
 			prompt_id: promptId,
 			owner_id: ownerId,
 			response,
@@ -60,7 +59,7 @@ export function createPromptResponse(promptId: bigint, response: string, ownerId
 
 export async function init(bindings: Bindings) {
 	const query = `CREATE TABLE IF NOT EXISTS prompts (
-		id INTEGER PRIMARY KEY NOT NULL UNIQUE,
+		id TEXT PRIMARY KEY NOT NULL UNIQUE,
 		prompt TEXT NOT NULL,
 		owner_id TEXT NOT NULL,
 		visibility TEXT NOT NULL DEFAULT 'PUBLIC',
@@ -72,8 +71,8 @@ export async function init(bindings: Bindings) {
 	CREATE INDEX IF NOT EXISTS idx_prompts_visibility ON prompts(visibility);
 
 	CREATE TABLE IF NOT EXISTS prompt_responses (
-		id INTEGER PRIMARY KEY NOT NULL UNIQUE,
-		prompt_id INTEGER NOT NULL,
+		id TEXT PRIMARY KEY NOT NULL UNIQUE,
+		prompt_id TEXT NOT NULL,
 		owner_id TEXT NOT NULL,
 		response TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -152,14 +151,14 @@ export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Pr
 	}
 }
 
-export async function updatePrompt(id: bigint, prompt: Prompt, bindings: Bindings): Promise<Prompt> {
+export async function updatePrompt(id: string, prompt: Prompt, bindings: Bindings): Promise<Prompt> {
 	await init(bindings);
 
 	const updatedAt = new Date();
 	prompt.updated_at = updatedAt;
 
 	try {
-		const result = await run(id.toString(), `UPDATE prompts SET prompt = ?, visibility = ?, updated_at = ? WHERE id = ?`, [
+		const result = await run(id, `UPDATE prompts SET prompt = ?, visibility = ?, updated_at = ? WHERE id = ?`, [
 			prompt.prompt,
 			prompt.visibility,
 			updatedAt,
@@ -181,11 +180,11 @@ export async function updatePrompt(id: bigint, prompt: Prompt, bindings: Binding
 	}
 }
 
-export async function deletePrompt(id: bigint, bindings: Bindings): Promise<void> {
+export async function deletePrompt(id: string, bindings: Bindings): Promise<void> {
 	await init(bindings);
 
 	try {
-		const result = await run(id.toString(), `DELETE FROM prompts WHERE id = ?`);
+		const result = await run(id, `DELETE FROM prompts WHERE id = ?`);
 
 		if (result.results.length === 0) {
 			throw new HTTPException(404, { message: 'Prompt not found' });
@@ -209,11 +208,12 @@ export async function savePromptResponse(prompt: Prompt, response: PromptRespons
 	await init(bindings);
 
 	try {
-		const result = await run(
-			`prompt-response-${response.id}`,
-			`INSERT INTO prompt_responses (id, prompt_id, owner_id, response) VALUES (?, ?, ?, ?)`,
-			[response.id, prompt.id, response.owner_id, response.response]
-		);
+		const result = await run(response.id, `INSERT INTO prompt_responses (id, prompt_id, owner_id, response) VALUES (?, ?, ?, ?)`, [
+			response.id,
+			prompt.id,
+			response.owner_id,
+			response.response
+		]);
 		if (result.error) {
 			throw new HTTPException(500, { message: `Failed to save prompt response: ${result.error}` });
 		}
@@ -226,14 +226,14 @@ export async function savePromptResponse(prompt: Prompt, response: PromptRespons
 	}
 }
 
-export async function updatePromptResponse(id: bigint, response: PromptResponse, bindings: Bindings): Promise<PromptResponse> {
+export async function updatePromptResponse(id: string, response: PromptResponse, bindings: Bindings): Promise<PromptResponse> {
 	await init(bindings);
 
 	const updatedAt = new Date();
 	response.updated_at = updatedAt;
 
 	try {
-		const result = await run(`prompt-response-${id}`, `UPDATE prompt_responses SET response = ?, updated_at = ? WHERE id = ?`, [
+		const result = await run(id, `UPDATE prompt_responses SET response = ?, updated_at = ? WHERE id = ?`, [
 			response.response,
 			updatedAt,
 			id
@@ -254,14 +254,14 @@ export async function updatePromptResponse(id: bigint, response: PromptResponse,
 	}
 }
 
-export async function deletePromptResponse(id: bigint, bindings: Bindings): Promise<void> {
+export async function deletePromptResponse(id: string, bindings: Bindings): Promise<void> {
 	const cacheKey = `prompt_response:${id}`;
 	await clearCache(cacheKey, bindings.KV_CACHE);
 
 	await init(bindings);
 
 	try {
-		const result = await run(`prompt-response-${id}`, `DELETE FROM prompt_responses WHERE id = ?`, [id]);
+		const result = await run(id, `DELETE FROM prompt_responses WHERE id = ?`, [id]);
 
 		if (result.results.length === 0) {
 			throw new HTTPException(404, { message: 'Prompt response not found' });
@@ -272,7 +272,7 @@ export async function deletePromptResponse(id: bigint, bindings: Bindings): Prom
 		}
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
-		mapper.deleteShardMapping(`prompt-response-${id}`);
+		mapper.deleteShardMapping(id);
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to delete prompt response: ${error}` });
 	}
@@ -315,7 +315,7 @@ export async function getPromptsCount(bindings: Bindings, search: string = ''): 
 	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
 }
 
-export async function getPromptById(id: bigint, bindings: Bindings): Promise<Prompt | null> {
+export async function getPromptById(id: string, bindings: Bindings): Promise<Prompt | null> {
 	const cacheKey = `prompt:${id}`;
 
 	return tryCache(cacheKey, bindings.KV_CACHE, async () => {
@@ -328,7 +328,7 @@ export async function getPromptById(id: bigint, bindings: Bindings): Promise<Pro
 // Prompt response retrieval functions
 
 export async function getPromptResponses(
-	promptId: bigint,
+	promptId: string,
 	bindings: Bindings,
 	limit: number = 25,
 	page: number = 0,
@@ -345,7 +345,7 @@ export async function getPromptResponses(
 }
 
 export async function getPromptResponseById(
-	id: bigint,
+	id: string,
 	bindings: Bindings,
 	ownerPrivacy: com.earthapp.account.Privacy
 ): Promise<PromptResponse | null> {

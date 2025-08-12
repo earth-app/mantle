@@ -104,6 +104,10 @@ export const hexCode = z
 	.regex(/^#[0-9A-Fa-f]{6}$/)
 	.openapi({ example: '#ffd700', description: 'A valid hex color code' });
 export const bool = z.boolean().openapi({ example: true });
+export const uuid = z.string().uuid().openapi({
+	example: '123e4567-e89b-12d3-a456-426614174000',
+	description: 'A valid UUID'
+});
 
 export const usernameParam = {
 	type: 'string',
@@ -120,10 +124,12 @@ export const idParam = {
 	example: 'eyb2cCNwc73b197cnsHbDqiU'
 } satisfies OpenAPIV3.ParameterObject['schema'];
 
-export const idNumberParam = {
-	type: 'integer',
-	minimum: 1,
-	example: 123
+export const uuidParam = {
+	type: 'string',
+	format: 'uuid',
+	minLength: 36,
+	maxLength: 36,
+	example: '123e4567-e89b-12d3-a456-426614174000'
 } satisfies OpenAPIV3.ParameterObject['schema'];
 
 // Enum Types

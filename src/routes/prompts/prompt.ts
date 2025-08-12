@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { describeRoute } from 'hono-openapi';
 import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
+import z from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 import * as schemas from '../../openapi/schemas';
 import * as tags from '../../openapi/tags';
@@ -30,7 +31,7 @@ prompt.get(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		responses: {
@@ -50,23 +51,12 @@ prompt.get(
 		tags: [tags.PROMPTS]
 	}),
 	async (c) => {
-		const id = c.req.param('promptId');
-		if (!id || Number.isNaN(id)) {
+		const promptId = c.req.param('promptId');
+		if (!promptId || promptId.length !== 36) {
 			return c.json(
 				{
 					code: 400,
-					message: 'Prompt ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const promptId = BigInt(id);
-		if (promptId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID must be a positive integer.'
+					message: 'Prompt ID is required and must be a valid UUID.'
 				},
 				400
 			);
@@ -93,6 +83,7 @@ prompt.patch(
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptUpdate),
 	validateMiddleware('json', schemas.promptCreate),
+	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
 	describeRoute({
 		summary: 'Update a specific prompt by ID',
 		description: 'Updates the details of a specific prompt in the Earth App.',
@@ -101,7 +92,7 @@ prompt.patch(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		requestBody: {
@@ -131,27 +122,7 @@ prompt.patch(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const id = c.req.param('promptId');
-		if (!id || Number.isNaN(id)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const promptId = BigInt(id);
-		if (promptId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID must be a positive integer.'
-				},
-				400
-			);
-		}
+		const promptId = c.req.valid('param');
 
 		const { prompt, visibility } = c.req.valid('json');
 
@@ -204,6 +175,7 @@ prompt.patch(
 prompt.delete(
 	'/',
 	globalRateLimit(true),
+	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
 	describeRoute({
 		summary: 'Delete a specific prompt by ID',
 		description: 'Deletes a specific prompt in the Earth App.',
@@ -212,7 +184,7 @@ prompt.delete(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		responses: {
@@ -230,27 +202,7 @@ prompt.delete(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const id = c.req.param('promptId');
-		if (!id || Number.isNaN(id)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const promptId = BigInt(id);
-		if (promptId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID must be a positive integer.'
-				},
-				400
-			);
-		}
+		const promptId = c.req.valid('param');
 
 		const owner = await getOwnerOfBearer(c);
 		if (!owner) {
@@ -292,6 +244,7 @@ prompt.delete(
 // Get Prompt Responses
 prompt.get(
 	'/responses',
+	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
 	describeRoute({
 		summary: 'Get prompt responses',
 		description: 'Retrieves all responses for a specific prompt.',
@@ -300,7 +253,7 @@ prompt.get(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			},
 			...schemas.paginatedParameters
 		],
@@ -321,27 +274,7 @@ prompt.get(
 		tags: [tags.PROMPTS]
 	}),
 	async (c) => {
-		const id = c.req.param('promptId');
-		if (!id || Number.isNaN(id)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const promptId = BigInt(id);
-		if (promptId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID must be a positive integer.'
-				},
-				400
-			);
-		}
+		const promptId = c.req.valid('param');
 
 		const params = paginatedParameters(c);
 		if (params.code && params.message) {
@@ -361,6 +294,7 @@ prompt.post(
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptResponseCreate),
 	validateMiddleware('json', schemas.promptResponseBody),
+	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
 	describeRoute({
 		summary: 'Create a new prompt response',
 		description: 'Creates a new response to a specific prompt in the Earth App.',
@@ -369,7 +303,7 @@ prompt.post(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		requestBody: {
@@ -399,36 +333,15 @@ prompt.post(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const promptId = c.req.param('promptId');
-		if (!promptId || Number.isNaN(promptId)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const id = BigInt(promptId);
-		if (id <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID and Response ID must be positive integers.'
-				},
-				400
-			);
-		}
-
+		const promptId = c.req.valid('param');
 		const { content } = c.req.valid('json');
 
-		const existingPrompt = await prompts.getPromptById(id, c.env);
+		const existingPrompt = await prompts.getPromptById(promptId, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
 					code: 404,
-					message: `Prompt with ID ${id} not found`
+					message: `Prompt with ID ${promptId} not found`
 				},
 				404
 			);
@@ -445,7 +358,7 @@ prompt.post(
 			);
 		}
 
-		const promptResponse = prompts.createPromptResponse(id, content, owner.account.id);
+		const promptResponse = prompts.createPromptResponse(promptId, content, owner.account.id);
 		const response = await prompts.savePromptResponse(existingPrompt, promptResponse, c.env);
 
 		return c.json(response, 201);
@@ -455,6 +368,7 @@ prompt.post(
 // Get Prompt Response by ID
 prompt.get(
 	'/responses/:responseId',
+	validateMiddleware('param', z.object({ promptId: schemas.uuid, responseId: schemas.uuid })),
 	describeRoute({
 		summary: 'Get a specific prompt response by ID',
 		description: 'Retrieves a specific response to a prompt in the Earth App.',
@@ -463,13 +377,13 @@ prompt.get(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			},
 			{
 				name: 'responseId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		responses: {
@@ -489,57 +403,25 @@ prompt.get(
 		tags: [tags.PROMPTS]
 	}),
 	async (c) => {
-		const promptId = c.req.param('promptId');
-		if (!promptId || Number.isNaN(promptId)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
+		const { promptId, responseId } = c.req.valid('param');
 
-		const responseId = c.req.param('responseId');
-		if (!responseId || Number.isNaN(responseId)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Response ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const id = BigInt(promptId);
-		const resId = BigInt(responseId);
-		if (id <= 0 || resId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID and Response ID must be positive integers.'
-				},
-				400
-			);
-		}
-
-		const existingPrompt = await prompts.getPromptById(id, c.env);
+		const existingPrompt = await prompts.getPromptById(promptId, c.env);
 		if (!existingPrompt) {
 			return c.json(
 				{
 					code: 404,
-					message: `Prompt with ID ${id} not found`
+					message: `Prompt with ID ${promptId} not found`
 				},
 				404
 			);
 		}
 
-		const existingResponse = await prompts.getPromptResponseById(resId, c.env, com.earthapp.account.Privacy.PUBLIC);
+		const existingResponse = await prompts.getPromptResponseById(responseId, c.env, com.earthapp.account.Privacy.PUBLIC);
 		if (!existingResponse) {
 			return c.json(
 				{
 					code: 404,
-					message: `Response with ID ${resId} not found`
+					message: `Response with ID ${responseId} not found`
 				},
 				404
 			);
@@ -549,7 +431,7 @@ prompt.get(
 			return c.json(
 				{
 					code: 404,
-					message: `Response with ID ${resId} does not belong to prompt with ID ${id}`
+					message: `Response with ID ${responseId} does not belong to prompt with ID ${promptId}`
 				},
 				404
 			);
@@ -565,6 +447,7 @@ prompt.patch(
 	globalRateLimit(true),
 	authRateLimit(rateLimitConfigs.promptResponseUpdate),
 	validateMiddleware('json', schemas.promptResponseBody),
+	validateMiddleware('param', z.object({ promptId: schemas.uuid, responseId: schemas.uuid })),
 	describeRoute({
 		summary: 'Update a specific prompt response by ID',
 		description: 'Updates a specific response to a prompt in the Earth App.',
@@ -573,13 +456,13 @@ prompt.patch(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			},
 			{
 				name: 'responseId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		requestBody: {
@@ -609,32 +492,7 @@ prompt.patch(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const prompt0 = c.req.param('promptId');
-		const response0 = c.req.param('responseId');
-
-		if (Number.isNaN(prompt0) || Number.isNaN(response0)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID and Response ID are required and must be valid numbers.'
-				},
-				400
-			);
-		}
-
-		const promptId = BigInt(prompt0);
-		const responseId = BigInt(response0);
-
-		if (promptId <= 0 || responseId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Prompt ID and Response ID must be positive integers.'
-				},
-				400
-			);
-		}
-
+		const { promptId, responseId } = c.req.valid('param');
 		const { content: response } = c.req.valid('json');
 
 		const owner = await getOwnerOfBearer(c);
@@ -695,6 +553,7 @@ prompt.patch(
 prompt.delete(
 	'/responses/:responseId',
 	globalRateLimit(true),
+	validateMiddleware('param', z.object({ promptId: schemas.uuid, responseId: schemas.uuid })),
 	describeRoute({
 		summary: 'Delete a specific prompt response by ID',
 		description: 'Deletes a specific response to a prompt in the Earth App.',
@@ -703,13 +562,13 @@ prompt.delete(
 				name: 'promptId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			},
 			{
 				name: 'responseId',
 				in: 'path',
 				required: true,
-				schema: schemas.idNumberParam
+				schema: schemas.uuidParam
 			}
 		],
 		responses: {
@@ -727,29 +586,7 @@ prompt.delete(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const response0 = c.req.param('responseId');
-
-		if (Number.isNaN(response0)) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Response ID is required and must be a valid number.'
-				},
-				400
-			);
-		}
-
-		const responseId = BigInt(response0);
-
-		if (responseId <= 0) {
-			return c.json(
-				{
-					code: 400,
-					message: 'Response ID must be a positive integer.'
-				},
-				400
-			);
-		}
+		const { promptId, responseId } = c.req.valid('param');
 
 		const owner = await getOwnerOfBearer(c);
 		if (!owner) {
@@ -759,6 +596,17 @@ prompt.delete(
 					message: 'Unauthorized: Invalid or missing authentication token.'
 				},
 				401
+			);
+		}
+
+		const existingPrompt = await prompts.getPromptById(promptId, c.env);
+		if (!existingPrompt) {
+			return c.json(
+				{
+					code: 404,
+					message: `Prompt with ID ${promptId} not found`
+				},
+				404
 			);
 		}
 
@@ -780,6 +628,16 @@ prompt.delete(
 					message: 'Forbidden: You do not have permission to delete this prompt response.'
 				},
 				403
+			);
+		}
+
+		if (existingPrompt.id !== existingResponse.prompt_id) {
+			return c.json(
+				{
+					code: 404,
+					message: `Response with ID ${responseId} does not belong to prompt with ID ${promptId}`
+				},
+				404
 			);
 		}
 
