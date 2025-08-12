@@ -147,7 +147,7 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 
 	if (!result.success) throw new DBError(`Failed to save user '${user.id}': ${result.error}`);
 
-	const mapper = new KVShardMapper(bindings.KV);
+	const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 	const shard = await mapper.getShardMapping(user.id);
 	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.id}' after creation`);
 	await mapper.setShardMapping(user.id, shard.shard, [`username:${user.username}`]);
@@ -194,10 +194,14 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 
 	user.public = toUser(user.account, fieldPrivacy, user.database.created_at, user.database.updated_at, user.database.last_login);
 
-	const mapper = new KVShardMapper(bindings.KV);
-	const shard = await mapper.getShardMapping(user.database.id);
-	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.database.id}' after update`);
-	await mapper.setShardMapping(user.database.id, shard.shard, [`username:${user.account.username}`]);
+	if (user.account.username !== user.database.username) {
+		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
+		const shard = await mapper.getShardMapping(user.database.id);
+		if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.database.id}' after update`);
+		await mapper.setShardMapping(user.database.id, shard.shard, [`username:${user.account.username}`]);
+
+		user.database.username = user.account.username;
+	}
 
 	return user;
 }
