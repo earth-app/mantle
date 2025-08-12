@@ -36,5 +36,7 @@ export const collegeDBConfig = (bindings: Bindings, targetRegion?: D1Region): Co
 
 			ap1: { region: 'apac', priority: 2 },
 			oc1: { region: 'oc', priority: 1 }
-		}
+		},
+		disableAutoMigration: true,
+		debug: false
 	}) satisfies CollegeDBConfig;
