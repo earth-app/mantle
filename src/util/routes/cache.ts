@@ -88,3 +88,13 @@ export async function clearCache(id: string, kv: KVNamespace): Promise<void> {
 		console.error(`Failed to clear cache for ${id}:`, err);
 	}
 }
+
+export async function clearCachePrefix(prefix: string, kv: KVNamespace): Promise<void> {
+	try {
+		const list = await kv.list({ prefix });
+
+		for (const key of list.keys) kv.delete(key.name);
+	} catch (err) {
+		console.error(`Failed to clear cache for prefix ${prefix}:`, err);
+	}
+}

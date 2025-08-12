@@ -152,6 +152,8 @@ export async function saveUser(user: com.earthapp.account.Account, password: str
 	if (!shard) throw new DBError(`Failed to get shard mapping for user '${user.id}' after creation`);
 	await mapper.setShardMapping(user.id, shard.shard, [`username:${user.username}`]);
 
+	cache.clearCachePrefix(`users:count:`, bindings.KV_CACHE);
+
 	return {
 		public: toUser(user, com.earthapp.account.Privacy.PRIVATE, new Date(), new Date(), new Date()),
 		account: user,
@@ -421,14 +423,18 @@ export async function getUsers(
 }
 
 export async function getUsersCount(bindings: Bindings, search: string = ''): Promise<number> {
-	await init(bindings);
-	const query = `SELECT COUNT(*) as count FROM users${search ? ' WHERE username LIKE ?' : ''}`;
-	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await firstAllShards<{ count: number }>(query, params);
+	const cacheKey = `users:count:${search.trim().toLowerCase()}`;
 
-	if (!result || result.length === 0) return 0;
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
+		const query = `SELECT COUNT(*) as count FROM users${search ? ' WHERE username LIKE ?' : ''}`;
+		const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
+		const result = await firstAllShards<{ count: number }>(query, params);
 
-	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+		if (!result || result.length === 0) return 0;
+
+		return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+	});
 }
 
 export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {
@@ -547,8 +553,8 @@ export async function deleteUser(id: string, username: string, bindings: Binding
 	mapper.deleteShardMapping(id);
 	mapper.deleteShardMapping(`username:${username}`);
 
-	const cacheKey = `user:exists:${username}`;
-	cache.clearCache(cacheKey, bindings.KV_CACHE);
+	cache.clearCache(`user:exists:${username}`, bindings.KV_CACHE);
+	cache.clearCachePrefix(`users:count:`, bindings.KV_CACHE);
 
 	return result.success;
 }

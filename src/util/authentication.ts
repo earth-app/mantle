@@ -226,7 +226,7 @@ export async function addSession(owner: string, bindings: Bindings, expiration: 
 	if (!owner) throw new Error('Owner is required');
 	const session = generateSessionToken();
 	await addToken(session, owner, bindings, expiration, true);
-	await validateSessions(owner, bindings); // Ensure no more than 3 sessions
+	validateSessions(owner, bindings); // Ensure no more than 3 sessions (background, no await)
 
 	return session;
 }
@@ -288,7 +288,7 @@ export async function bumpCurrentSession(owner: string, bindings: Bindings) {
 	await init(bindings);
 
 	const query = `UPDATE tokens SET expires_at = datetime('now', '+14 days') WHERE owner = ? AND is_session = TRUE ORDER BY created_at DESC LIMIT 1`;
-	await runAllShards(query, [owner]);
+	runAllShards(query, [owner]);
 }
 
 // Authentication Helpers

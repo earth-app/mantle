@@ -152,6 +152,8 @@ export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Pr
 		prompt.created_at = new Date();
 		prompt.updated_at = new Date();
 
+		cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
+
 		return prompt;
 	} catch (error) {
 		throw new HTTPException(400, { message: `Failed to create prompt: ${error}` });
@@ -202,7 +204,8 @@ export async function deletePrompt(id: string, bindings: Bindings): Promise<void
 		}
 
 		const cacheKey = `prompt:${id}`;
-		await cache.clearCache(cacheKey, bindings.KV_CACHE);
+		cache.clearCache(cacheKey, bindings.KV_CACHE);
+		cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
 
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 		mapper.deleteShardMapping(id);
@@ -312,14 +315,18 @@ export async function getPrompts(bindings: Bindings, limit: number = 25, page: n
 }
 
 export async function getPromptsCount(bindings: Bindings, search: string = ''): Promise<number> {
-	await init(bindings);
-	const query = `SELECT COUNT(*) as count FROM prompts${search ? ' WHERE prompt LIKE ?' : ''}`;
-	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await firstAllShards<{ count: number }>(query, params);
+	const cacheKey = `prompts:count:${search.trim().toLowerCase()}`;
 
-	if (!result || result.length === 0) return 0;
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
+		const query = `SELECT COUNT(*) as count FROM prompts${search ? ' WHERE prompt LIKE ?' : ''}`;
+		const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
+		const result = await firstAllShards<{ count: number }>(query, params);
 
-	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+		if (!result || result.length === 0) return 0;
+
+		return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+	});
 }
 
 export async function getPromptById(id: string, bindings: Bindings): Promise<Prompt | null> {
