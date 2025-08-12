@@ -14,8 +14,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20250810.0",
-    "@earth-app/collegedb": "^1.0.6",
+    "@cloudflare/workers-types": "^4.20250812.0",
+    "@earth-app/collegedb": "^1.0.7",
     "@earth-app/ocean": "1.0.0-3f0c7fa",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.2",

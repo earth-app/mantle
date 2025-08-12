@@ -62,11 +62,11 @@
 
     "@cloudflare/workerd-windows-64": ["@cloudflare/workerd-windows-64@1.20250803.0", "", { "os": "win32", "cpu": "x64" }, "sha512-uLV8gdudz36o9sUaAKbBxxTwZwLFz1KyW7QpBvOo4+r3Ib8yVKXGiySIMWGD7A0urSMrjf3e5LlLcJKgZUOjMA=="],
 
-    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250810.0", "", {}, "sha512-GAJcKMrlWrrgfpFkYAc9AYiyPM1sMfY0gzrNA7T+J7kVh82hdIWXaz7bykc+B/kgDRteO7RBKfwVEU0rB/hk2Q=="],
+    "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20250812.0", "", {}, "sha512-LmKSud4X9zMqGhfoO09C2OQPMGMGpPCaQ4IaeF0xQW3n4eDBVlDNDC+Yn2EhsMp1Cvo3X7xtyVpLmuOeF6HyWw=="],
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
 
-    "@earth-app/collegedb": ["@earth-app/collegedb@1.0.6", "https://npm.pkg.github.com/download/@earth-app/collegedb/1.0.6/4d7d23a4f013ba8b7ffc3b9a091850cb768358b9", { "dependencies": { "@cloudflare/workers-types": "^4.20250726.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-STTh7NUXuxSC1/ueVvx/MtGkpJ2mN3amXSETwOiOS7PbJQ3H1PR0JO6IuJ/yQxjK3F02+VL+h3k3EPQh5hauKg=="],
+    "@earth-app/collegedb": ["@earth-app/collegedb@1.0.7", "https://npm.pkg.github.com/download/@earth-app/collegedb/1.0.7/ac447f66472809ea069a77238474bafb3cf9cf06", { "dependencies": { "@cloudflare/workers-types": "^4.20250726.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-PQyK5LzItn6g8KswC1Se1+yhcEckB4pvpqJec7NxmR6w70olXMtLZDMyoMGl9a2mPC2u/VSgLxhlnGmqq/IXFg=="],
 
     "@earth-app/ocean": ["@earth-app/ocean@1.0.0-3f0c7fa", "https://npm.pkg.github.com/download/@earth-app/ocean/1.0.0-3f0c7fa/205a33f51b6cfb3f8c0751242ea3255c6f9f97d9", { "dependencies": { "rss-parser": "^3.13.0", "ws": "8.18.0" } }, "sha512-C/FlRAnbqT1wkFT+9SrUilzGvGK3ukXSFKmeZ+NcxLRoZvrn7e1SFBgnc6m6RSiYc3hYCwiAIITMHN91idcNxQ=="],
 
