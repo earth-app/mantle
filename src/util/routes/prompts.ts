@@ -335,22 +335,22 @@ export async function getPrompts(bindings: Bindings, limit: number = 25, page: n
 	});
 }
 
-export async function getRandomPrompts(bindings: Bindings, limit: number = 25): Promise<Prompt[]> {
+export async function getRandomPrompts(bindings: Bindings, limit: number = 10): Promise<Prompt[]> {
 	await init(bindings);
 
 	const query = `SELECT * FROM prompts ORDER BY RANDOM() LIMIT ?`;
-	const shardCount = Object.keys(collegeDB.shards).length;
-	const results = await allAllShards<Prompt>(query, [limit / shardCount + 1]); // Fetch slightly more than needed to ensure enough random prompts
+	const results = await allAllShards<Prompt>(query, [limit]); // Fetch slightly more than needed to ensure enough random prompts
 
 	const allPrompts: Prompt[] = [];
 	results.forEach((result) => {
-		if (!result.success || !result.results) return;
-
 		// Sort random results by created_at in descending order
-		allPrompts.push(...result.results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+		allPrompts.push(...result.results);
 	});
 
-	return allPrompts.slice(0, limit);
+	return allPrompts
+		.sort(() => Math.random() - 0.5) // Shuffle, then take limit
+		.slice(0, limit)
+		.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); // Return sorted by created_at
 }
 
 export async function getPromptsCount(bindings: Bindings, search: string = ''): Promise<number> {

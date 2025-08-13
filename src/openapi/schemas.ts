@@ -158,8 +158,6 @@ export const idArray = z.array(id).openapi({
 	example: ['bu72behwJd9wjfoz98enfoaw', 'audyrehwJd9wjfoz98enfoaw']
 });
 
-// Objects
-
 /// Request Objects
 export const userCreate = z.object({
 	username: username,
@@ -312,13 +310,50 @@ export const promptResponseBody = z
 		}
 	});
 
+export const oceanArticle = z
+	.object({
+		title: text,
+		url: z.string().url(),
+		author: text,
+		source: text,
+		links: z.record(z.string().url()).optional(),
+		abstract: text.optional(),
+		content: text,
+		theme_color: z.string().optional(),
+		keywords: z.array(text).optional(),
+		date: date,
+		favicon: z.string().url().optional()
+	})
+	.openapi({
+		example: {
+			title: 'Understanding Quantum Computing',
+			url: 'https://example.com/quantum-computing',
+			author: 'John Doe',
+			source: 'Tech Journal',
+			links: {
+				related: 'https://example.com/quantum-computing/related',
+				more_info: 'https://example.com/quantum-computing/more-info'
+			},
+			abstract: 'A brief overview of quantum computing principles.',
+			content:
+				'Quantum computing is a type of computation that harnesses the principles of quantum mechanics. ' +
+				'It uses quantum bits, or qubits, which can exist in multiple states simultaneously, allowing for parallel processing of information. ' +
+				'This capability enables quantum computers to solve certain problems much faster than classical computers.',
+			theme_color: '#ff11ff',
+			keywords: ['quantum', 'computing', 'technology'],
+			date: '2025-05-11T10:00:00Z',
+			favicon: 'https://example.com/quantum-computing/favicon.ico'
+		}
+	});
+
 export const articleCreate = z
 	.object({
 		title: text.max(48).openapi({ example: 'Understanding Quantum Computing', description: 'The title of the article' }),
 		description: text.max(512).openapi({ description: 'A brief description of the article' }),
 		tags: z.array(text.max(30)).max(10).default([]).openapi({ description: 'Tags for the article, max 10 tags, each max 30 characters' }),
 		content: text.min(50).max(10000).openapi({ description: 'The main content of the article, min 50 characters, max 10000 characters' }),
-		color: hexCode.optional()
+		color: hexCode.optional(),
+		ocean: oceanArticle.optional()
 	})
 	.openapi({
 		example: {
@@ -539,7 +574,7 @@ export const activities = z.array(activity);
 
 export const prompt = z
 	.object({
-		id: z.number().positive().openapi({ example: 123 }),
+		id: uuid,
 		prompt: text,
 		visibility: userPrivacy,
 		created_at: date,
@@ -547,7 +582,7 @@ export const prompt = z
 	})
 	.openapi({
 		example: {
-			id: 123,
+			id: '123e4567-e89b-12d3-a456-426614174000',
 			prompt: 'What is the meaning of life?',
 			visibility: 'PUBLIC',
 			created_at: '2025-05-11T10:00:00Z',
@@ -558,16 +593,16 @@ export const prompts = z.array(prompt);
 
 export const promptResponse = z
 	.object({
-		id: z.number().int().positive().openapi({ example: 456 }),
-		prompt_id: z.number().positive().openapi({ example: 123 }),
+		id: uuid,
+		prompt_id: uuid,
 		response: text,
 		created_at: date,
 		updated_at: date.optional()
 	})
 	.openapi({
 		example: {
-			id: 456,
-			prompt_id: 123,
+			id: '456e7890-e12b-34d5-a456-426614174000',
+			prompt_id: '123e4567-e89b-12d3-a456-426614174000',
 			response: 'The meaning of life is 42.',
 			created_at: '2025-05-11T10:00:00Z',
 			updated_at: '2025-05-11T12:00:00Z'
@@ -585,21 +620,7 @@ export const article = z
 		content: text.min(50).max(10000),
 		created_at: date,
 		updated_at: date.optional(),
-		ocean: z
-			.object({
-				title: text,
-				url: z.string().url(),
-				author: text,
-				source: text,
-				links: z.record(z.string().url()).optional(),
-				abstract: text,
-				content: text,
-				theme_color: z.string().optional(),
-				keywords: z.array(text).optional(),
-				date: date,
-				favicon: z.string().url().optional()
-			})
-			.optional()
+		ocean: oceanArticle.optional()
 	})
 	.openapi({
 		example: {
