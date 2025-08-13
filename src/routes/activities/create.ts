@@ -47,13 +47,33 @@ createActivity.post(
 	}),
 	adminMiddleware(),
 	async (c) => {
-		const { id, name, description, types, aliases } = c.req.valid('json');
+		const { id, name, description, types, aliases, fields } = c.req.valid('json');
 
 		if (!Array.isArray(types) || types.some((type) => typeof type !== 'string')) {
 			return c.json(
 				{
 					code: 400,
 					message: 'Types must be an array of strings'
+				},
+				400
+			);
+		}
+
+		if (fields && (typeof fields !== 'object' || Array.isArray(fields))) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Fields must be an object'
+				},
+				400
+			);
+		}
+
+		if (Object.values(fields || {}).some((value) => typeof value !== 'string')) {
+			return c.json(
+				{
+					code: 400,
+					message: 'All field values must be strings'
 				},
 				400
 			);
@@ -76,6 +96,12 @@ createActivity.post(
 
 			if (aliases) {
 				activity.addAliases(aliases);
+			}
+
+			if (fields) {
+				for (const [key, value] of Object.entries<string>(fields)) {
+					activity.setField(key, value);
+				}
 			}
 		});
 
