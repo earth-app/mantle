@@ -207,14 +207,22 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 	return user;
 }
 
-export async function refreshUserActivities(activity: ActivityObject, bindings: Bindings) {
+export async function refreshUserActivities(activity: ActivityObject, bindings: Bindings, deleteActivity: boolean = false) {
 	const users = await getAccountsBy((acc) => acc.activities.asJsReadonlyArrayView().some((a) => a.id === activity.database.id), bindings);
 	if (!users) return;
 
 	const promises: Promise<UserObject>[] = [];
 	for (const user of users) {
+		const oldList = [...user.account.activities.asJsReadonlyArrayView()];
+		const index = oldList.findIndex((a) => a.id === activity.database.id);
+		if (index === -1) continue; // Activity not found in user's list
+
 		user.account.removeActivityById(activity.database.id);
-		user.account.addActivity(activity.activity);
+		if (!deleteActivity) {
+			oldList[index] = activity.activity;
+			user.account.setActivities(oldList);
+		}
+
 		promises.push(
 			updateUser(user, com.earthapp.account.Privacy.PRIVATE, bindings).catch((error) => {
 				console.error(`Failed to update user ${user.public.id} for activity ${activity.database.id}: ${error}`);

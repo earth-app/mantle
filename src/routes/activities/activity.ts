@@ -262,6 +262,8 @@ activity.delete(
 			);
 		}
 
+		c.executionCtx.waitUntil(refreshUserActivities(activity, c.env, true));
+
 		return c.body(null, 204);
 	}
 );
