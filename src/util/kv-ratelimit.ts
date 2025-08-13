@@ -133,6 +133,12 @@ export const rateLimitConfigs = {
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:event:update'
 	},
+	// 10 every 3 minutes per user
+	randomPromptRefresh: {
+		requests: 10,
+		windowMs: 3 * 60 * 1000, // 3 minutes
+		keyPrefix: 'rl:prompt:random:refresh'
+	},
 	// 7 every 2 minutes per user
 	promptCreate: {
 		requests: 7,

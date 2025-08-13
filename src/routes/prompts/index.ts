@@ -11,6 +11,7 @@ import prompt from './prompt';
 
 // Implementation
 import Bindings from '../../bindings';
+import { ipRateLimit, rateLimitConfigs } from '../../util/kv-ratelimit';
 import { getPrompts, getPromptsCount, getRandomPrompts } from '../../util/routes/prompts';
 import { paginatedParameters } from '../../util/util';
 
@@ -58,6 +59,7 @@ prompts.get(
 
 prompts.get(
 	'/random',
+	ipRateLimit(rateLimitConfigs.randomPromptRefresh),
 	describeRoute({
 		summary: 'Retrieve a random list of prompts',
 		description: 'Gets a random list of prompts from the Earth App.',
