@@ -12,6 +12,7 @@ import Bindings from '../../bindings';
 import { Activity } from '../../types/activities';
 import { adminMiddleware } from '../../util/authentication';
 import * as activities from '../../util/routes/activities';
+import { refreshUserActivities } from '../../util/routes/users';
 
 const activity = new Hono<{ Bindings: Bindings }>();
 
@@ -191,6 +192,8 @@ activity.patch(
 				400
 			);
 		}
+
+		c.executionCtx.waitUntil(refreshUserActivities(updatedActivity, c.env));
 
 		return c.json(updatedActivity.public, 200);
 	}

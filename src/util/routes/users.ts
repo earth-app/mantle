@@ -10,6 +10,7 @@ import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardM
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
+import { ActivityObject } from '../../types/activities';
 import { DBError, ValidationError } from '../../types/errors';
 import { collegeDB, init } from '../collegedb';
 import * as cache from './cache';
@@ -204,6 +205,28 @@ export async function updateUser(user: UserObject, fieldPrivacy: com.earthapp.ac
 	}
 
 	return user;
+}
+
+export async function refreshUserActivities(activity: ActivityObject, bindings: Bindings) {
+	const users = await getAccountsBy((acc) => acc.activities.asJsReadonlyArrayView().some((a) => a.id === activity.database.id), bindings);
+	if (!users) return;
+
+	const promises: Promise<UserObject>[] = [];
+	for (const user of users) {
+		user.account.removeActivityById(activity.database.id);
+		user.account.addActivity(activity.activity);
+		promises.push(
+			updateUser(user, com.earthapp.account.Privacy.PRIVATE, bindings).catch((error) => {
+				console.error(`Failed to update user ${user.public.id} for activity ${activity.database.id}: ${error}`);
+				return Promise.resolve(user); // Continue processing other users even if one fails
+			})
+		);
+	}
+
+	for (let i = 0; i < promises.length; i += 100) {
+		const batch = promises.slice(i, i + 100);
+		await Promise.all(batch);
+	}
 }
 
 // Login Function
@@ -501,6 +524,28 @@ export async function getAccountBy(
 	}
 
 	return user;
+}
+
+export async function getAccountsBy(
+	predicate: (account: com.earthapp.account.Account) => boolean,
+	bindings: Bindings
+): Promise<UserObject[]> {
+	let users: UserObject[] = [];
+	let page = 0;
+	while (true) {
+		const results = await getUsers(bindings, 100, page, undefined, com.earthapp.account.Privacy.PRIVATE);
+		if (results.length === 0) break;
+
+		for (const u of results) {
+			if (predicate(u.account)) {
+				users.push(u);
+			}
+		}
+
+		page++;
+	}
+
+	return users;
 }
 
 export async function getUserByEmail(email: string, bindings: Bindings) {
