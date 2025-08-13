@@ -1,7 +1,8 @@
-import { all, allAllShards, createSchemaAcrossShards, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
+import { all, allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run, runAllShards } from '@earth-app/collegedb';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
+import { DBError } from '../../types/errors';
 import { Prompt, PromptResponse } from '../../types/prompts';
 import { collegeDB, init } from '../collegedb';
 import * as cache from './cache';
@@ -122,11 +123,9 @@ async function findPromptResponse(
 			if (!response.owner_id) return response;
 
 			const owner = await getUserById(response.owner_id, bindings, ownerPrivacy);
-			if (!owner) {
-				throw new HTTPException(404, { message: `Owner not found for response ID ${response.id}` });
-			}
+			if (!owner) return response;
 
-			if (owner.account.isFieldPrivate('promptResponses', ownerPrivacy)) {
+			if (owner.account.visibility === com.earthapp.Visibility.PRIVATE || owner.account.isFieldPrivate('promptResponses', ownerPrivacy)) {
 				response.owner_id = undefined; // Hide owner ID if privacy settings require it
 			}
 
@@ -156,7 +155,7 @@ export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Pr
 
 		return prompt;
 	} catch (error) {
-		throw new HTTPException(400, { message: `Failed to create prompt: ${error}` });
+		throw new DBError(`Failed to create prompt: ${error}`);
 	}
 }
 
@@ -184,7 +183,7 @@ export async function updatePrompt(id: string, prompt: Prompt, bindings: Binding
 
 		return obj;
 	} catch (error) {
-		throw new HTTPException(400, { message: `Failed to update prompt: ${error}` });
+		throw new DBError(`Failed to update prompt: ${error}`);
 	}
 }
 
@@ -209,7 +208,30 @@ export async function deletePrompt(id: string, bindings: Bindings): Promise<void
 		const mapper = new KVShardMapper(bindings.KV, { hashShardMappings: false });
 		mapper.deleteShardMapping(id);
 	} catch (error) {
-		throw new HTTPException(400, { message: `Failed to delete prompt: ${error}` });
+		throw new DBError(`Failed to delete prompt: ${error}`);
+	}
+}
+
+export async function deleteExpiredPrompts(bindings: Bindings, days: number = 5) {
+	await init(bindings);
+
+	try {
+		const expirationDate = new Date();
+		expirationDate.setDate(expirationDate.getDate() - days);
+		const result = await runAllShards(`DELETE FROM prompts WHERE created_at < ?`, [expirationDate.toISOString()]);
+
+		if (result.some((r) => r.error)) {
+			throw new HTTPException(500, {
+				message: `Failed to delete expired prompts: ${result
+					.map((r) => r.error)
+					.filter((e) => e)
+					.join(', ')}`
+			});
+		}
+
+		await cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
+	} catch (error) {
+		throw new DBError(`Failed to delete expired prompts: ${error}`);
 	}
 }
 
@@ -313,6 +335,24 @@ export async function getPrompts(bindings: Bindings, limit: number = 25, page: n
 	});
 }
 
+export async function getRandomPrompts(bindings: Bindings, limit: number = 25): Promise<Prompt[]> {
+	await init(bindings);
+
+	const query = `SELECT * FROM prompts ORDER BY RANDOM() LIMIT ?`;
+	const shardCount = Object.keys(collegeDB.shards).length;
+	const results = await allAllShards<Prompt>(query, [limit / shardCount + 1]); // Fetch slightly more than needed to ensure enough random prompts
+
+	const allPrompts: Prompt[] = [];
+	results.forEach((result) => {
+		if (!result.success || !result.results) return;
+
+		// Sort random results by created_at in descending order
+		allPrompts.push(...result.results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+	});
+
+	return allPrompts.slice(0, limit);
+}
+
 export async function getPromptsCount(bindings: Bindings, search: string = ''): Promise<number> {
 	const cacheKey = `prompts:count:${search.trim().toLowerCase()}`;
 
@@ -362,7 +402,21 @@ export async function getPromptResponseById(
 	bindings: Bindings,
 	ownerPrivacy: com.earthapp.account.Privacy
 ): Promise<PromptResponse | null> {
+	await init(bindings);
+
 	const query = `SELECT * FROM prompt_responses WHERE id = ?`;
-	const responses = await findPromptResponse(query, ownerPrivacy, bindings, id);
-	return responses.length > 0 ? responses[0] : null;
+	const response = await first<PromptResponse>(id, query, [id]);
+
+	if (!response) return null;
+
+	if (response.owner_id) {
+		const owner = await getUserById(response.owner_id, bindings, ownerPrivacy);
+		if (!owner) return response;
+
+		if (owner.account.visibility === com.earthapp.Visibility.PRIVATE || owner.account.isFieldPrivate('promptResponses', ownerPrivacy)) {
+			response.owner_id = undefined; // Hide owner ID if privacy settings require it
+		}
+	}
+
+	return response;
 }

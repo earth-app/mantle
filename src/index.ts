@@ -15,6 +15,7 @@ import { getClosestRegionFromIP } from '@earth-app/collegedb';
 import { HTTPException } from 'hono/http-exception';
 import * as packageJson from '../package.json';
 import Bindings from './bindings';
+import scheduled from './scheduled';
 import { DBError, ValidationError } from './types/errors';
 import { setCurrentRegion } from './util/collegedb';
 
@@ -145,4 +146,7 @@ app.get(
 	})
 );
 
-export default app;
+export default {
+	fetch: app.fetch,
+	scheduled: scheduled
+};
