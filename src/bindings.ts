@@ -20,7 +20,9 @@ type Bindings = {
 	DB_EN1: D1Database;
 	DB_EN2: D1Database;
 	DB_EN3: D1Database;
+	DB_EN4: D1Database;
 	DB_WN1: D1Database;
+	DB_WN2: D1Database;
 
 	DB_WE1: D1Database;
 	DB_EE1: D1Database;

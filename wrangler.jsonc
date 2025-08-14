@@ -92,11 +92,21 @@
 			"database_name": "earth-app_en3",
 			"database_id": "55942853-6300-431b-a54c-ce588d63e006"
 		},
+		{
+			"binding": "DN_EN4",
+			"database_name": "earth-app_en4",
+			"database_id": "73316960-b652-4783-8c00-39a423414d76"
+		},
 		// Western North America
 		{
 			"binding": "DB_WN1",
 			"database_name": "earth-app_wn1",
 			"database_id": "a303f45a-57e0-4c16-928a-a22c94246a53"
+		},
+		{
+			"binding": "DB_WN2",
+			"database_name": "earth-app_wn2",
+			"database_id": "56a1c3fd-6d2d-4ddd-9acf-2f9b89942279"
 		},
 		// Western Europe
 		{
