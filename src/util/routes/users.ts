@@ -491,6 +491,8 @@ export async function getUserById(
 	bindings: Bindings,
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ) {
+	if (id === ADMIN_USER_OBJECT.public.id) return ADMIN_USER_OBJECT;
+
 	await init(bindings);
 	const result = await first<DBUser>(id, `SELECT * FROM users WHERE id = ? LIMIT 1`, [id]);
 	if (!result) return null;
@@ -503,6 +505,8 @@ export async function getUserByUsername(
 	bindings: Bindings,
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ) {
+	if (username === ADMIN_USER_OBJECT.public.username) return ADMIN_USER_OBJECT;
+
 	await init(bindings);
 	const query = `SELECT * FROM users WHERE username = ? LIMIT 1`;
 	const result = await first<DBUser>(`username:${username}`, query, [username]);
@@ -673,6 +677,10 @@ export async function generateProfilePhoto(user: User, ai: Ai): Promise<Uint8Arr
 }
 
 export async function getProfilePhoto(user: User, bindings: Bindings): Promise<Uint8Array> {
+	if (user.id === ADMIN_USER_OBJECT.public.id) {
+		return (await bindings.ASSETS.fetch('https://assets.local/cloud.png'))!.bytes();
+	}
+
 	const profileImage = `users/${user.id}/profile.png`;
 
 	const bytes = (await bindings.R2.get(profileImage))?.bytes();

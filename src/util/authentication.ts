@@ -64,6 +64,8 @@ export async function addToken(token: string, owner: string, bindings: Bindings,
 	if (token.length != com.earthapp.util.API_KEY_LENGTH)
 		throw new Error(`Token must be ${com.earthapp.util.API_KEY_LENGTH} characters long`);
 
+	if (owner === ADMIN_USER_OBJECT.public.id) throw new Error('Cannot add token for admin user directly. Use admin API key.');
+
 	await init(bindings);
 
 	const count = await getTokenCount(owner, bindings);
@@ -129,6 +131,8 @@ export async function removeToken(token: string, bindings: Bindings) {
 }
 
 export async function isValidToken(token: string, bindings: Bindings) {
+	if (!token) throw new Error('Token is required');
+	if (token === bindings.ADMIN_API_KEY) return true; // Admin API key is always valid
 	await init(bindings);
 
 	const lookupHash = await encryption.computeLookupHash(token, bindings.LOOKUP_HMAC_KEY);
@@ -160,6 +164,7 @@ export async function isValidToken(token: string, bindings: Bindings) {
 
 export async function getTokenCount(owner: string, bindings: Bindings) {
 	if (!owner) throw new ValidationError('Owner is required');
+	if (owner === ADMIN_USER_OBJECT.public.id) return 1; // Admin user has a single token (admin API key)
 
 	const cacheKey = `token-count:${owner}`;
 
@@ -190,6 +195,7 @@ export async function getOwnerOfToken(token: string, bindings: Bindings) {
 
 export async function validateSessions(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
+	if (owner === ADMIN_USER_OBJECT.public.id) return; // Admin user does not need session validation
 
 	await init(bindings);
 
@@ -224,6 +230,8 @@ export function generateSessionToken() {
 
 export async function addSession(owner: string, bindings: Bindings, expiration: number = 14) {
 	if (!owner) throw new Error('Owner is required');
+	if (owner === ADMIN_USER_OBJECT.public.id) throw new Error('Cannot add session for admin user directly. Use admin API key.');
+
 	const session = generateSessionToken();
 	await addToken(session, owner, bindings, expiration, true);
 	validateSessions(owner, bindings); // Ensure no more than 3 sessions (background, no await)
@@ -233,6 +241,8 @@ export async function addSession(owner: string, bindings: Bindings, expiration: 
 
 export async function removeSession(session: string, bindings: Bindings) {
 	if (!session) throw new Error('Session Token is required');
+	if (session === bindings.ADMIN_API_KEY) throw new Error('Cannot remove admin API key session directly.');
+
 	await removeToken(session, bindings);
 }
 
@@ -271,6 +281,7 @@ export async function isValidSession(session: string, bindings: Bindings) {
 
 export async function getSessionCount(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
+	if (owner === ADMIN_USER_OBJECT.public.id) return 1; // Admin user has a single session (admin API key)
 
 	const cacheKey = `session-count:${owner}`;
 	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
@@ -285,6 +296,8 @@ export async function getSessionCount(owner: string, bindings: Bindings) {
 
 export async function bumpCurrentSession(owner: string, bindings: Bindings) {
 	if (!owner) throw new Error('Owner is required');
+	if (owner === ADMIN_USER_OBJECT.public.id) return; // Admin user does not need session bump
+
 	await init(bindings);
 
 	const query = `UPDATE tokens SET expires_at = datetime('now', '+14 days') WHERE owner = ? AND is_session = TRUE ORDER BY created_at DESC LIMIT 1`;
