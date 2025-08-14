@@ -26,9 +26,9 @@
 	"ai": {
 		"binding": "AI"
 	},
-	// "limits": {
-	// 	"cpu_ms": 200
-	// },
+	"limits": {
+		"cpu_ms": 200
+	},
 	"kv_namespaces": [
 		{
 			"binding": "KV",
