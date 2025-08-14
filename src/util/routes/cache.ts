@@ -2,19 +2,24 @@ import { KVNamespace } from '@cloudflare/workers-types';
 import Bindings from '../../bindings';
 import { ValidationError } from '../../types/errors';
 
-const CACHE_TTL = 60 * 60 * 4000; // 4 hours in milliseconds
+const CACHE_TTL = 60 * 60 * 4; // 4 hours in seconds
 
 export async function cache(id: string, value: any, kv: KVNamespace) {
 	if (!value) return;
 
-	// Handle Uint8Array serialization properly
-	const serializedValue = JSON.stringify(value, (key, val) => {
-		if (val instanceof Uint8Array) {
-			return { __type: 'Uint8Array', data: Array.from(val) };
-		}
-		return val;
-	});
-	return kv.put(id, serializedValue, { metadata: { date: Date.now() } });
+	try {
+		// Handle Uint8Array serialization properly
+		const serializedValue = JSON.stringify(value, (_, val) => {
+			if (val instanceof Uint8Array) {
+				return { __type: 'Uint8Array', data: Array.from(val) };
+			}
+			return val;
+		});
+		return kv.put(id, serializedValue, { expirationTtl: CACHE_TTL });
+	} catch (error) {
+		console.error(`Failed to cache data for ${id}:`, error);
+		throw error;
+	}
 }
 
 export async function healthCheck(bindings: Bindings): Promise<boolean> {
@@ -27,21 +32,20 @@ export async function healthCheck(bindings: Bindings): Promise<boolean> {
 	}
 }
 
-export async function getCache<T>(id: string, kv: KVNamespace): Promise<[T, number] | null> {
-	const result = await kv.getWithMetadata(id);
+export async function getCache<T>(id: string, kv: KVNamespace): Promise<T | null> {
+	const result = await kv.get(id);
 	if (!result) return null;
-	if (!result.value) return null;
 
 	try {
 		// Parse with proper Uint8Array deserialization
-		const parsed = JSON.parse(result.value as string, (key, val) => {
+		const parsed = JSON.parse(result as string, (_, val) => {
 			if (val && typeof val === 'object' && val.__type === 'Uint8Array') {
 				return new Uint8Array(val.data);
 			}
 			return val;
 		}) as T;
-		const metadata = result.metadata as { date: number } | null;
-		return [parsed, metadata?.date || Date.now()];
+
+		return parsed;
 	} catch (e) {
 		return null;
 	}
@@ -58,25 +62,13 @@ export async function tryCache<T>(id: string, kv: KVNamespace, fallback: () => P
 
 	const result = await getCache<T>(id, kv);
 	if (result) {
-		const time = result[1];
-		const value = result[0];
-
-		if (Date.now() - time < CACHE_TTL) {
-			return value;
-		} else {
-			// Cache expired
-			kv.delete(id).catch((err) => {
-				console.error(`Failed to delete expired cache for ${id}:`, err);
-			});
-
-			const obj = await fallback();
-			cache(id, obj, kv);
-			return obj;
-		}
+		return result;
 	} else {
 		// Cache miss, call fallback
 		const obj = await fallback();
-		cache(id, obj, kv);
+		cache(id, obj, kv).catch((err) => {
+			console.error(`Failed to cache data for ${id}:`, err);
+		});
 		return obj;
 	}
 }
@@ -91,9 +83,11 @@ export async function clearCache(id: string, kv: KVNamespace): Promise<void> {
 
 export async function clearCachePrefix(prefix: string, kv: KVNamespace): Promise<void> {
 	try {
-		const list = await kv.list({ prefix });
-
-		for (const key of list.keys) kv.delete(key.name);
+		let list = await kv.list({ prefix });
+		while (list.list_complete === false) {
+			for (const key of list.keys) await kv.delete(key.name);
+			list = await kv.list({ prefix, cursor: list.cursor });
+		}
 	} catch (err) {
 		console.error(`Failed to clear cache for prefix ${prefix}:`, err);
 	}

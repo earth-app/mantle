@@ -694,9 +694,16 @@ export async function getProfilePhoto(user: User, bindings: Bindings): Promise<U
 }
 
 export async function newProfilePhoto(user: User, bindings: Bindings) {
+	if (user.id === ADMIN_USER_OBJECT.public.id) {
+		throw new ValidationError(`Cannot change profile photo for admin user.`);
+	}
+
 	const profileImage = `users/${user.id}/profile.png`;
 	const profile = await generateProfilePhoto(user, bindings.AI);
 	await bindings.R2.put(profileImage, profile);
+
+	const cacheKey = `user:profile:${user.id}`;
+	await cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 	return profile;
 }
