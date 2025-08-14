@@ -677,16 +677,20 @@ export async function generateProfilePhoto(user: User, ai: Ai): Promise<Uint8Arr
 }
 
 export async function getProfilePhoto(user: User, bindings: Bindings): Promise<Uint8Array> {
-	if (user.id === ADMIN_USER_OBJECT.public.id) {
-		return (await bindings.ASSETS.fetch('https://assets.local/cloud.png'))!.bytes();
-	}
+	const cacheKey = `user:profile:${user.id}`;
 
-	const profileImage = `users/${user.id}/profile.png`;
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		if (user.id === ADMIN_USER_OBJECT.public.id) {
+			return (await bindings.ASSETS.fetch('https://assets.local/cloud.png'))!.bytes();
+		}
 
-	const bytes = (await bindings.R2.get(profileImage))?.bytes();
-	if (bytes) return bytes;
+		const profileImage = `users/${user.id}/profile.png`;
 
-	return (await bindings.ASSETS.fetch('https://assets.local/earth-app.png'))!.bytes();
+		const bytes = (await bindings.R2.get(profileImage))?.bytes();
+		if (bytes) return bytes;
+
+		return (await bindings.ASSETS.fetch('https://assets.local/earth-app.png'))!.bytes();
+	});
 }
 
 export async function newProfilePhoto(user: User, bindings: Bindings) {
