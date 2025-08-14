@@ -627,25 +627,27 @@ const profileModel = '@cf/bytedance/stable-diffusion-xl-lightning';
 export const userProfilePhotoPrompt = (user: User) => {
 	return {
 		prompt: `
-		Generate a heavily expressive, artistic, colorful, vibrant, and unique profile picture for a user with the username "${user.username}."
+		Generate a heavily expressive, abstract, artistic, colorful, vibrant, and unique profile picture for a user with the username "${user.username}."
 		The profile picture should be a special representation of the user as a whole, so include lots of vibrant colors and effects in every corner.
 		The photo should be around inanimate objects or attributes, avoiding things like people or animals, or symbols that represent them (like toys or paintings.)
 
 		The style of the profile picture should be in a flat, colorful, painting-like tone and style. Whatever you choose, make sure it is vibrant and colorful.
         There should be no text, logos, or any other elements that could be considered as a watermark or branding. The primary object should be placed in the
         center of the image. The background should be a simple, abstract design that complements the primary object without distracting from it.
+        The object should be easily recognizable and visually appealing, with a focus on the colors and shapes rather than intricate details.
 
 		For more information about the user, here is the user's biography:
 		"${user.account.bio ?? 'No biography provided.'}"
 
+        They created their account on ${user.created_at}. They have set their account visibility to ${user.account.visibility}.
 		The user lives in ${user.account.country ?? 'Unknown Country'}. Their name is "${user.fullName ?? 'No name provided.'}."
 
 		Lastly, the like the following activities:
-		${user.account.activities.map((activity) => `- ${activity.name}: ${activity.description?.substring(50) ?? 'No description available.'}\n`)}
+		${user.account.activities.map((activity) => `- ${activity.name}: ${activity.description?.substring(70) ?? 'No description available.'}\n`)}
 
 		If any field says "None Provided" or "Unknown," disregard that element as apart of the profile picture, as the user has omitted said details.
 		`.trim(),
-		negative_prompt: `Avoid elements of toys, scary elements, political or sensitive statements, and words.`,
+		negative_prompt: `Avoid elements of toys, scary elements, political or sensitive statements, words, or any branding.`,
 		guidance: 35
 	} satisfies AiTextToImageInput;
 };
