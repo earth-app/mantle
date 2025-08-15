@@ -8,7 +8,7 @@ import { HTTPException } from 'hono/http-exception';
 import { ContentfulStatusCode } from 'hono/utils/http-status';
 import Bindings from '../bindings';
 import { DBError, ValidationError } from '../types/errors';
-import { collegeDBConfig } from './collegedb';
+import { collegeDB, collegeDBConfig } from './collegedb';
 import * as encryption from './encryption';
 import * as cache from './routes/cache';
 import { ADMIN_USER_OBJECT, getUserById, getUserByUsername } from './routes/users';
@@ -28,27 +28,38 @@ type TokenRow = {
 };
 
 export async function init(bindings: Bindings) {
-	const query = `CREATE TABLE IF NOT EXISTS tokens (
-        id TEXT PRIMARY KEY NOT NULL UNIQUE,
-        owner TEXT NOT NULL,
-        token BLOB NOT NULL,
-        encryption_key TEXT NOT NULL,
-        encryption_iv TEXT NOT NULL,
-        token_hash TEXT NOT NULL,
-        lookup_hash TEXT NOT NULL UNIQUE,
-        salt TEXT NOT NULL,
-        is_session BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-        expires_at TIMESTAMP DEFAULT (datetime('now', '+30 days')) NOT NULL
-    );
-	CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_lookup_hash ON tokens (lookup_hash);
-	CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens (owner);
-	CREATE INDEX IF NOT EXISTS idx_tokens_is_session ON tokens (is_session);
-	CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens (expires_at);`;
-
 	const config = collegeDBConfig(bindings);
 	await initializeAsync(config);
-	await createSchemaAcrossShards(config.shards, query);
+}
+
+export async function healthCheck(bindings: Bindings) {
+	try {
+		await init(bindings);
+		const query = `CREATE TABLE IF NOT EXISTS tokens (
+            id TEXT PRIMARY KEY NOT NULL UNIQUE,
+            owner TEXT NOT NULL,
+            token BLOB NOT NULL,
+            encryption_key TEXT NOT NULL,
+            encryption_iv TEXT NOT NULL,
+            token_hash TEXT NOT NULL,
+            lookup_hash TEXT NOT NULL UNIQUE,
+            salt TEXT NOT NULL,
+            is_session BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            expires_at TIMESTAMP DEFAULT (datetime('now', '+30 days')) NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tokens_lookup_hash ON tokens (lookup_hash);
+        CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens (owner);
+        CREATE INDEX IF NOT EXISTS idx_tokens_is_session ON tokens (is_session);
+        CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens (expires_at);`;
+
+		await createSchemaAcrossShards(collegeDB.shards, query);
+	} catch (error) {
+		console.error(`Events Health check failed: ${error}`);
+		return false;
+	}
+
+	return true;
 }
 
 async function hashToken(token: string, secret: Uint8Array): Promise<string> {

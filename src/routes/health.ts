@@ -6,8 +6,8 @@ import * as schemas from '../openapi/schemas';
 import * as tags from '../openapi/tags';
 
 import Bindings from '../bindings';
-import { adminMiddleware } from '../util/authentication';
 
+import { adminMiddleware, healthCheck as authenticationHealthCheck } from '../util/authentication';
 import { healthCheck as activitiesHealthCheck } from '../util/routes/activities';
 import { healthCheck as articlesHealthCheck } from '../util/routes/articles';
 import { healthCheck as cacheHealthCheck } from '../util/routes/cache';
@@ -36,7 +36,8 @@ healthCheck.get(
 									activities: z.boolean(),
 									events: z.boolean(),
 									users: z.boolean(),
-									prompts: z.boolean()
+									prompts: z.boolean(),
+									authentication: z.boolean()
 								}),
 								kv: z.object({
 									articles: z.boolean()
@@ -73,7 +74,8 @@ healthCheck.get(
 						activities: await activitiesHealthCheck(c.env),
 						events: await eventsHealthCheck(c.env),
 						users: await usersHealthCheck(c.env),
-						prompts: await promptsHealthCheck(c.env)
+						prompts: await promptsHealthCheck(c.env),
+						authentication: await authenticationHealthCheck(c.env)
 					},
 					kv: {
 						articles: await articlesHealthCheck(c.env)
