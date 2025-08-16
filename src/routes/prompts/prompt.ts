@@ -274,7 +274,7 @@ prompt.get(
 		tags: [tags.PROMPTS]
 	}),
 	async (c) => {
-		const promptId = c.req.valid('param');
+		const { promptId } = c.req.valid('param');
 
 		const params = paginatedParameters(c);
 		if (params.code && params.message) {
@@ -333,7 +333,7 @@ prompt.post(
 	}),
 	typeMiddleware(com.earthapp.account.AccountType.WRITER),
 	async (c) => {
-		const promptId = c.req.valid('param');
+		const { promptId } = c.req.valid('param');
 		const { content } = c.req.valid('json');
 
 		const existingPrompt = await prompts.getPromptById(promptId, c.env);
