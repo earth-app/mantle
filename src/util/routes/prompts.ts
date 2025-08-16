@@ -151,6 +151,7 @@ export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Pr
 		prompt.created_at = new Date();
 		prompt.updated_at = new Date();
 
+		await cache.clearCachePrefix(`prompts:`, bindings.KV_CACHE);
 		await cache.clearCachePrefix(`prompts:count:`, bindings.KV_CACHE);
 
 		return prompt;
