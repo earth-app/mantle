@@ -20,7 +20,14 @@ export const info = z.object({
 	title: z.string().openapi({ example: 'Earth App' }),
 	version: z.string().openapi({ example: '1.0.0' }),
 	description: z.string().openapi({ example: 'Backend API for The Earth App' }),
-	date: z.string().openapi({ example: '2025-05-11' })
+	date: z.string().openapi({ example: '2025-05-11' }),
+	stats: z.array(
+		z.object({
+			binding: z.string().openapi({ example: 'en3' }),
+			count: z.number().openapi({ example: 1000 })
+		})
+	),
+	utilization: z.record(z.string(), z.number())
 });
 
 export function paginated(schema: z.ZodTypeAny) {
