@@ -72,6 +72,19 @@ const regionCoords: Record<D1Region, { lat: number; lon: number }> = {
 	af: { lat: -26.2041, lon: 28.0473 } // Johannesburg
 };
 const R = 6371; // Earth's radius in kilometers
+const SHARD_BATCH_SIZE = 3; // how many shards to query at once for list endpoints
+
+function getShardBatchSize(tableName: string, limit: number, dbCount: number): number {
+	let base = SHARD_BATCH_SIZE;
+	const t = tableName.toLowerCase();
+	if (t === 'activities' || t === 'prompts')
+		base = 2; // smaller lists
+	else base = limit > 50 ? 4 : 3; // heavier tables
+
+	// Clamp and never exceed number of shards
+	base = Math.max(2, Math.min(base, 5));
+	return Math.min(base, Math.max(1, dbCount));
+}
 
 export function getSortedShards() {
 	if (!collegeDB || !currentRegion)
@@ -117,6 +130,149 @@ export function getSortedShards() {
 	return shardEntries;
 }
 
+// Helper to run COUNT(*) in parallel across shards
+async function parallelCount(
+	dbs: ReturnType<typeof getSortedShards>,
+	tableName: string,
+	whereClause?: string,
+	params: (string | number)[] = []
+) {
+	const sql = whereClause
+		? `SELECT COUNT(*) as count FROM ${tableName} WHERE ${whereClause}`
+		: `SELECT COUNT(*) as count FROM ${tableName}`;
+	const counts = await Promise.all(
+		dbs.map(async (s) => {
+			try {
+				const res = await s.db
+					.prepare(sql)
+					.bind(...params)
+					.first<{ count: number }>();
+				return res?.count ?? 0;
+			} catch (e) {
+				console.error(`Error getting count from shard ${s.name}:`, e);
+				return 0;
+			}
+		})
+	);
+	return counts;
+}
+
+// Helper to run COUNT(*) across shards with early stopping when threshold reached
+async function batchedCountUntil(
+	dbs: ReturnType<typeof getSortedShards>,
+	tableName: string,
+	whereClause: string | undefined,
+	params: (string | number)[] = [],
+	threshold: number, // stop when cumulative count >= threshold
+	limitForBatching: number
+) {
+	let total = 0;
+	const counts: number[] = [];
+	const batchSize = getShardBatchSize(tableName, limitForBatching, dbs.length);
+	for (let i = 0; i < dbs.length; i += batchSize) {
+		const batch = dbs.slice(i, i + batchSize);
+		const sql = whereClause
+			? `SELECT COUNT(*) as count FROM ${tableName} WHERE ${whereClause}`
+			: `SELECT COUNT(*) as count FROM ${tableName}`;
+		const batchCounts = await Promise.all(
+			batch.map(async (s) => {
+				try {
+					const res = await s.db
+						.prepare(sql)
+						.bind(...params)
+						.first<{ count: number }>();
+					return res?.count ?? 0;
+				} catch (e) {
+					console.error(`Error getting count from shard ${s.name}:`, e);
+					return 0;
+				}
+			})
+		);
+		for (let j = 0; j < batchCounts.length; j++) {
+			const c = batchCounts[j] ?? 0;
+			counts[i + j] = c;
+			total += c;
+		}
+		if (total >= threshold) break;
+	}
+
+	// Fill any missing with 0 to keep array length consistent
+	for (let k = 0; k < dbs.length; k++) if (counts[k] === undefined) counts[k] = 0;
+	return counts;
+}
+
+// Helper to fetch data from selected shards in parallel maintaining shard order
+async function parallelFetch<T>(
+	dbs: ReturnType<typeof getSortedShards>,
+	tableName: string,
+	orderParam: string,
+	perShard: { index: number; limit: number; offset: number; whereClause?: string; params?: (string | number)[] }[]
+): Promise<T[]> {
+	const results = await Promise.all(
+		perShard.map(async ({ index, limit, offset, whereClause, params }) => {
+			const shard = dbs[index];
+			const base = whereClause
+				? `SELECT * FROM ${tableName} WHERE ${whereClause} ORDER BY ${orderParam} LIMIT ? OFFSET ?`
+				: `SELECT * FROM ${tableName} ORDER BY ${orderParam} LIMIT ? OFFSET ?`;
+			try {
+				const stmt = shard.db.prepare(base);
+				const bindParams: (string | number)[] = [];
+				if (params && params.length) bindParams.push(...params);
+				bindParams.push(limit, offset);
+				const res = await stmt.bind(...bindParams).all<T>();
+				if (!res.success) throw new DBError(`Failed to fetch from ${tableName} in shard ${shard.name}: ${res.error}`);
+				return res.results as T[];
+			} catch (e) {
+				console.error(`Error querying shard ${shard.name}:`, e);
+				return [] as T[];
+			}
+		})
+	);
+
+	// Preserve shard order as in perShard input, then flatten
+	return results.flat();
+}
+
+// Helper to fetch top N rows from shards in batches with early stop, preserving shard priority order
+async function fetchTopFromShards<T>(
+	dbs: ReturnType<typeof getSortedShards>,
+	tableName: string,
+	orderParam: string,
+	limit: number,
+	whereClause?: string,
+	params: (string | number)[] = []
+): Promise<T[]> {
+	let collected: T[] = [];
+	const batchSize = getShardBatchSize(tableName, limit, dbs.length);
+	for (let i = 0; i < dbs.length && collected.length < limit; i += batchSize) {
+		const batch = dbs.slice(i, i + batchSize);
+		const remaining = Math.max(0, limit - collected.length);
+		// Allocate fairly across shards in this batch to minimize over-fetch
+		const perShardLimit = Math.max(1, Math.ceil(remaining / batch.length));
+		const sql = whereClause
+			? `SELECT * FROM ${tableName} WHERE ${whereClause} ORDER BY ${orderParam} LIMIT ? OFFSET 0`
+			: `SELECT * FROM ${tableName} ORDER BY ${orderParam} LIMIT ? OFFSET 0`;
+		const batchResults = await Promise.all(
+			batch.map(async (s) => {
+				try {
+					const stmt = s.db.prepare(sql);
+					const res = await stmt.bind(...params, perShardLimit).all<T>();
+					if (!res.success) throw new DBError(`Failed to fetch from ${tableName} in shard ${s.name}: ${res.error}`);
+					return res.results as T[];
+				} catch (e) {
+					console.error(`Error querying shard ${s.name}:`, e);
+					return [] as T[];
+				}
+			})
+		);
+		for (const part of batchResults) {
+			if (collected.length >= limit) break;
+			collected = collected.concat(part);
+		}
+	}
+	return collected.slice(0, limit);
+}
+
 export async function getAllInTable<T>(
 	bindings: Bindings,
 	tableName: string,
@@ -128,63 +284,37 @@ export async function getAllInTable<T>(
 ): Promise<T[]> {
 	await init(bindings);
 	const dbs = getSortedShards();
-	const results: T[] = [];
 
-	let currentOffset = offset;
-	let remainingLimit = limit;
-
-	for (let i = 0; i < dbs.length && remainingLimit > 0; i++) {
-		const currentDB = dbs[i].db;
-
-		try {
-			const countQuery = search
-				? `SELECT COUNT(*) as count FROM ${tableName} WHERE ${searchParam} LIKE ?`
-				: `SELECT COUNT(*) as count FROM ${tableName}`;
-
-			let countResult;
-			if (search) {
-				countResult = await currentDB.prepare(countQuery).bind(`%${search}%`).first<{ count: number }>();
-			} else {
-				countResult = await currentDB.prepare(countQuery).first<{ count: number }>();
-			}
-
-			if (!countResult || countResult.count === 0) continue;
-
-			const shardCount = countResult.count;
-
-			if (currentOffset >= shardCount) {
-				currentOffset -= shardCount;
-				continue;
-			}
-
-			// Calculate how many records to fetch from this shard
-			const fetchLimit = Math.min(remainingLimit, shardCount - currentOffset);
-			const dataQuery = search
-				? `SELECT * FROM ${tableName} WHERE ${searchParam} LIKE ? ORDER BY ${orderParam} LIMIT ? OFFSET ?`
-				: `SELECT * FROM ${tableName} ORDER BY ${orderParam} LIMIT ? OFFSET ?`;
-
-			let dataResults;
-			if (search) {
-				dataResults = await currentDB.prepare(dataQuery).bind(`%${search}%`, fetchLimit, currentOffset).all<T>();
-			} else {
-				dataResults = await currentDB.prepare(dataQuery).bind(fetchLimit, currentOffset).all<T>();
-			}
-
-			if (!dataResults.success) {
-				throw new DBError(`Failed to fetch data from ${tableName} in shard ${dbs[i].name}: ${dataResults.error}`);
-			}
-
-			results.push(...dataResults.results);
-			remainingLimit -= dataResults.results.length;
-
-			currentOffset = 0;
-		} catch (error) {
-			console.error(`Error querying shard ${dbs[i].name}:`, error);
-			continue;
-		}
+	// Fast path for first page: avoid global COUNT and avoid waiting for all shards
+	if (offset === 0) {
+		const whereClause = search ? `${searchParam} LIKE ?` : undefined;
+		const params = search ? [`%${search}%`] : [];
+		return fetchTopFromShards<T>(dbs, tableName, orderParam, limit, whereClause, params);
 	}
 
-	return results;
+	// General path: counts with early stop, then targeted fetches
+	const where = search ? `${searchParam} LIKE ?` : undefined;
+	const params = search ? [`%${search}%`] : [];
+	const threshold = offset + limit;
+	const counts = await batchedCountUntil(dbs, tableName, where, params, threshold, limit);
+
+	let remainingOffset = offset;
+	let remainingLimit = limit;
+	const plan: { index: number; limit: number; offset: number; whereClause?: string; params?: (string | number)[] }[] = [];
+	for (let i = 0; i < counts.length && remainingLimit > 0; i++) {
+		const shardCount = counts[i] ?? 0;
+		if (shardCount <= remainingOffset) {
+			remainingOffset -= shardCount;
+			continue;
+		}
+		const shardOffset = remainingOffset;
+		const shardFetch = Math.min(remainingLimit, shardCount - shardOffset);
+		plan.push({ index: i, limit: shardFetch, offset: shardOffset, whereClause: where, params });
+		remainingOffset = 0;
+		remainingLimit -= shardFetch;
+	}
+	if (plan.length === 0) return [];
+	return parallelFetch<T>(dbs, tableName, orderParam, plan);
 }
 
 export async function getAllInTableWithFilter<T>(
@@ -200,62 +330,40 @@ export async function getAllInTableWithFilter<T>(
 ): Promise<T[]> {
 	await init(bindings);
 	const dbs = getSortedShards();
-	const results: T[] = [];
 
-	let currentOffset = offset;
-	let remainingLimit = limit;
+	const clauses: string[] = [];
+	const params: (string | number)[] = [];
+	clauses.push(`${filterField} = ?`);
+	params.push(filterValue);
+	if (search && searchParam) {
+		clauses.push(`${searchParam} LIKE ?`);
+		params.push(`%${search}%`);
+	}
+	const where = clauses.join(' AND ');
 
-	for (let i = 0; i < dbs.length && remainingLimit > 0; i++) {
-		const currentDB = dbs[i].db;
-
-		try {
-			let whereClause = `${filterField} = ?`;
-			const params: (string | number)[] = [filterValue];
-
-			if (search && searchParam) {
-				whereClause += ` AND ${searchParam} LIKE ?`;
-				params.push(`%${search}%`);
-			}
-
-			// Get count for this shard
-			const countQuery = `SELECT COUNT(*) as count FROM ${tableName} WHERE ${whereClause}`;
-			let countResult = await currentDB
-				.prepare(countQuery)
-				.bind(...params)
-				.first<{ count: number }>();
-
-			if (!countResult || countResult.count === 0) continue;
-
-			const shardCount = countResult.count;
-			if (currentOffset >= shardCount) {
-				currentOffset -= shardCount;
-				continue;
-			}
-
-			const fetchLimit = Math.min(remainingLimit, shardCount - currentOffset);
-			const dataQuery = `SELECT * FROM ${tableName} WHERE ${whereClause} ORDER BY ${orderParam} LIMIT ? OFFSET ?`;
-			const queryParams = [...params, fetchLimit, currentOffset];
-
-			let dataResults = await currentDB
-				.prepare(dataQuery)
-				.bind(...queryParams)
-				.all<T>();
-
-			if (!dataResults.success) {
-				throw new DBError(`Failed to fetch data from ${tableName} in shard ${dbs[i].name}: ${dataResults.error}`);
-			}
-
-			results.push(...dataResults.results);
-			remainingLimit -= dataResults.results.length;
-
-			currentOffset = 0;
-		} catch (error) {
-			console.error(`Error querying shard ${dbs[i].name}:`, error);
-			continue;
-		}
+	if (offset === 0) {
+		return fetchTopFromShards<T>(dbs, tableName, orderParam, limit, where, params);
 	}
 
-	return results;
+	const threshold = offset + limit;
+	const counts = await batchedCountUntil(dbs, tableName, where, params, threshold, limit);
+	let remainingOffset = offset;
+	let remainingLimit = limit;
+	const plan: { index: number; limit: number; offset: number; whereClause?: string; params?: (string | number)[] }[] = [];
+	for (let i = 0; i < counts.length && remainingLimit > 0; i++) {
+		const shardCount = counts[i] ?? 0;
+		if (shardCount <= remainingOffset) {
+			remainingOffset -= shardCount;
+			continue;
+		}
+		const shardOffset = remainingOffset;
+		const shardFetch = Math.min(remainingLimit, shardCount - shardOffset);
+		plan.push({ index: i, limit: shardFetch, offset: shardOffset, whereClause: where, params });
+		remainingOffset = 0;
+		remainingLimit -= shardFetch;
+	}
+	if (plan.length === 0) return [];
+	return parallelFetch<T>(dbs, tableName, orderParam, plan);
 }
 
 export async function getCountInTable(
@@ -266,33 +374,10 @@ export async function getCountInTable(
 ): Promise<number> {
 	await init(bindings);
 	const dbs = getSortedShards();
-	let totalCount = 0;
-
-	for (let i = 0; i < dbs.length; i++) {
-		const currentDB = dbs[i].db;
-
-		try {
-			const countQuery = search
-				? `SELECT COUNT(*) as count FROM ${tableName} WHERE ${searchParam} LIKE ?`
-				: `SELECT COUNT(*) as count FROM ${tableName}`;
-
-			let countResult;
-			if (search) {
-				countResult = await currentDB.prepare(countQuery).bind(`%${search}%`).first<{ count: number }>();
-			} else {
-				countResult = await currentDB.prepare(countQuery).first<{ count: number }>();
-			}
-
-			if (countResult && countResult.count) {
-				totalCount += countResult.count;
-			}
-		} catch (error) {
-			console.error(`Error getting count from shard ${dbs[i].name}:`, error);
-			continue;
-		}
-	}
-
-	return totalCount;
+	const where = search ? `${searchParam} LIKE ?` : undefined;
+	const params = search ? [`%${search}%`] : [];
+	const counts = await batchedCountUntil(dbs, tableName, where, params, Number.POSITIVE_INFINITY, 100);
+	return counts.reduce((a, b) => a + (b ?? 0), 0);
 }
 
 export async function getAllInTableByField<T>(
@@ -306,66 +391,8 @@ export async function getAllInTableByField<T>(
 	searchParam?: string,
 	search?: string
 ): Promise<T[]> {
-	await init(bindings);
-	const dbs = getSortedShards();
-	const results: T[] = [];
-
-	let currentOffset = offset;
-	let remainingLimit = limit;
-
-	for (let i = 0; i < dbs.length && remainingLimit > 0; i++) {
-		const currentDB = dbs[i].db;
-
-		try {
-			let whereClause = `WHERE ${filterField} = ?`;
-			let params = [filterValue];
-
-			if (search && searchParam) {
-				whereClause += ` AND ${searchParam} LIKE ?`;
-				params.push(`%${search}%`);
-			}
-
-			const countQuery = `SELECT COUNT(*) as count FROM ${tableName} ${whereClause}`;
-			const countResult = await currentDB
-				.prepare(countQuery)
-				.bind(...params)
-				.first<{ count: number }>();
-
-			if (!countResult || countResult.count === 0) {
-				continue; // Skip empty shards
-			}
-
-			const shardCount = countResult.count;
-
-			if (currentOffset >= shardCount) {
-				currentOffset -= shardCount;
-				continue;
-			}
-
-			// Calculate how many records to fetch from this shard
-			const fetchLimit = Math.min(remainingLimit, shardCount - currentOffset);
-			const dataQuery = `SELECT * FROM ${tableName} ${whereClause} ORDER BY ${orderParam} LIMIT ? OFFSET ?`;
-			const dataParams = [...params, fetchLimit, currentOffset];
-			const dataResults = await currentDB
-				.prepare(dataQuery)
-				.bind(...dataParams)
-				.all<T>();
-
-			if (!dataResults.success) {
-				throw new DBError(`Failed to fetch data from ${tableName} in shard ${dbs[i].name}: ${dataResults.error}`);
-			}
-
-			results.push(...dataResults.results);
-			remainingLimit -= dataResults.results.length;
-
-			currentOffset = 0;
-		} catch (error) {
-			console.error(`Error querying shard ${dbs[i].name}:`, error);
-			continue;
-		}
-	}
-
-	return results;
+	// Delegate to the unified filtered implementation
+	return getAllInTableWithFilter<T>(bindings, tableName, orderParam, limit, offset, filterField, filterValue, searchParam, search);
 }
 
 export async function getCountInTableWithFilter(
@@ -378,34 +405,15 @@ export async function getCountInTableWithFilter(
 ): Promise<number> {
 	await init(bindings);
 	const dbs = getSortedShards();
-	let totalCount = 0;
-
-	for (let i = 0; i < dbs.length; i++) {
-		const currentDB = dbs[i].db;
-
-		try {
-			let whereClause = `${filterField} = ?`;
-			const params: (string | number)[] = [filterValue];
-
-			if (search && searchParam) {
-				whereClause += ` AND ${searchParam} LIKE ?`;
-				params.push(`%${search}%`);
-			}
-
-			const countQuery = `SELECT COUNT(*) as count FROM ${tableName} WHERE ${whereClause}`;
-			let countResult = await currentDB
-				.prepare(countQuery)
-				.bind(...params)
-				.first<{ count: number }>();
-
-			if (countResult && countResult.count) {
-				totalCount += countResult.count;
-			}
-		} catch (error) {
-			console.error(`Error getting count from shard ${dbs[i].name}:`, error);
-			continue;
-		}
+	const clauses: string[] = [];
+	const params: (string | number)[] = [];
+	clauses.push(`${filterField} = ?`);
+	params.push(filterValue);
+	if (search && searchParam) {
+		clauses.push(`${searchParam} LIKE ?`);
+		params.push(`%${search}%`);
 	}
-
-	return totalCount;
+	const where = clauses.join(' AND ');
+	const counts = await parallelCount(dbs, tableName, where, params);
+	return counts.reduce((a, b) => a + (b ?? 0), 0);
 }
