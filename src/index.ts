@@ -17,7 +17,7 @@ import * as packageJson from '../package.json';
 import Bindings from './bindings';
 import scheduled from './scheduled';
 import { DBError, ValidationError } from './types/errors';
-import { setCurrentRegion } from './util/collegedb';
+import { currentRegion, setCurrentRegion } from './util/collegedb';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -82,6 +82,7 @@ app.use((c, next) => {
 
 	// Set Target Region
 	setCurrentRegion(getClosestRegionFromIP(c.req.raw as unknown as Request));
+	c.res.headers.set('X-CollegeDB-Region', currentRegion ?? 'unknown');
 
 	return next();
 });
