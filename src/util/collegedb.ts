@@ -74,6 +74,20 @@ const regionCoords: Record<D1Region, { lat: number; lon: number }> = {
 const R = 6371; // Earth's radius in kilometers
 const SHARD_BATCH_SIZE = 10; // how many shards to query at once for list endpoints
 
+// Adaptive batch sizing: larger for small/short-lived tables to finish in one wave,
+// conservative for large tables to avoid tail latency and throttling.
+function getShardBatchSize(tableName: string, limit: number, shardCount: number): number {
+	const t = tableName.toLowerCase();
+	const isSmall = t === 'prompts' || t === 'activities';
+
+	let base = 5; // default
+	if (isSmall)
+		base = 8; // favor one-wave completion
+	else base = limit > 50 ? 6 : 4; // keep tail stable on heavy tables
+
+	return Math.min(Math.max(2, base), SHARD_BATCH_SIZE, Math.max(1, shardCount));
+}
+
 export function getSortedShards() {
 	if (!collegeDB || !currentRegion)
 		return Object.entries(collegeDB.shards).map(([name, db]) => ({ name, db, priority: 0, distance: Infinity }));
@@ -156,7 +170,8 @@ async function batchedCountUntil(
 ) {
 	let total = 0;
 	const counts: number[] = [];
-	const batchSize = Math.min(SHARD_BATCH_SIZE, dbs.length);
+	const batchSize = getShardBatchSize(tableName, limitForBatching, dbs.length);
+
 	for (let i = 0; i < dbs.length; i += batchSize) {
 		const batch = dbs.slice(i, i + batchSize);
 		const sql = whereClause
@@ -231,12 +246,16 @@ async function fetchTopFromShards<T>(
 	params: (string | number)[] = []
 ): Promise<T[]> {
 	let collected: T[] = [];
-	const batchSize = Math.min(SHARD_BATCH_SIZE, dbs.length);
+	const batchSize = getShardBatchSize(tableName, limit, dbs.length);
+	const isSmall = tableName.toLowerCase() === 'prompts' || tableName.toLowerCase() === 'activities';
+
+	// Slack to make first wave likely sufficient for small tables, modest for large
+	const slackFactor = isSmall ? 2.0 : limit > 50 ? 1.4 : 1.2;
+
 	for (let i = 0; i < dbs.length && collected.length < limit; i += batchSize) {
 		const batch = dbs.slice(i, i + batchSize);
 		const remaining = Math.max(0, limit - collected.length);
-		// Allocate fairly across shards in this batch to minimize over-fetch
-		const perShardLimit = Math.max(1, Math.ceil(remaining / batch.length));
+		const perShardLimit = Math.max(1, Math.ceil((remaining / batch.length) * slackFactor));
 		const sql = whereClause
 			? `SELECT * FROM ${tableName} WHERE ${whereClause} ORDER BY ${orderParam} LIMIT ? OFFSET 0`
 			: `SELECT * FROM ${tableName} ORDER BY ${orderParam} LIMIT ? OFFSET 0`;
@@ -258,6 +277,7 @@ async function fetchTopFromShards<T>(
 			collected = collected.concat(part);
 		}
 	}
+
 	return collected.slice(0, limit);
 }
 
