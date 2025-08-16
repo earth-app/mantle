@@ -22,7 +22,6 @@ describe('Events Utility Functions', () => {
 			expect(typeof events.getEvents).toBe('function');
 			expect(typeof events.doesEventExist).toBe('function');
 			expect(typeof events.patchEvent).toBe('function');
-			expect(typeof events.init).toBe('function');
 		});
 
 		it('should handle createEvent function', async () => {
@@ -41,20 +40,6 @@ describe('Events Utility Functions', () => {
 			} catch (error) {
 				// Expected in test environment
 				expect(error).toBeDefined();
-			}
-		});
-
-		it('should handle checkTableExists function', async () => {
-			const { init: checkTableExists } = await import('../../../src/util/routes/events');
-
-			const mockDB = (globalThis as any).mockBindings?.DB;
-			if (mockDB) {
-				try {
-					const result = await checkTableExists(mockDB);
-					expect(result).toBeUndefined(); // checkTableExists returns void
-				} catch (error) {
-					expect(error).toBeDefined();
-				}
 			}
 		});
 
@@ -176,7 +161,7 @@ describe('Events Utility Functions', () => {
 						e.description = 'Original description';
 					});
 
-					const result = await patchEvent(event, { name: 'Updated Event' }, mockDB);
+					const result = await patchEvent({ public: {} as any, event, database: {} as any }, { name: 'Updated Event' }, mockDB);
 					expect(result).toBeDefined();
 				} catch (error) {
 					// Expected in test environment

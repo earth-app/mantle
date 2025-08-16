@@ -23,7 +23,6 @@ describe('Activities Utility Functions', () => {
 			expect(typeof activities.getActivities).toBe('function');
 			expect(typeof activities.doesActivityExist).toBe('function');
 			expect(typeof activities.patchActivity).toBe('function');
-			expect(typeof activities.init).toBe('function');
 		});
 
 		it('should handle createActivity function', async () => {
@@ -42,20 +41,6 @@ describe('Activities Utility Functions', () => {
 			} catch (error) {
 				// Expected in test environment
 				expect(error).toBeDefined();
-			}
-		});
-
-		it('should handle checkTableExists function', async () => {
-			const { init: checkTableExists } = await import('../../../src/util/routes/activities');
-
-			const mockDB = (globalThis as any).mockBindings?.DB;
-			if (mockDB) {
-				try {
-					const result = await checkTableExists(mockDB);
-					expect(result).toBeUndefined(); // checkTableExists returns void
-				} catch (error) {
-					expect(error).toBeDefined();
-				}
 			}
 		});
 
@@ -104,11 +89,11 @@ describe('Activities Utility Functions', () => {
 		it('should handle deleteActivity function', async () => {
 			const { deleteActivity } = await import('../../../src/util/routes/activities');
 
-			const mockDB = (globalThis as any).mockBindings?.DB;
+			const mockBindings = (globalThis as any).mockBindings;
 
-			if (mockDB) {
+			if (mockBindings) {
 				try {
-					const result = await deleteActivity('test-activity-id', mockDB);
+					const result = await deleteActivity('test-activity-id', [], mockBindings);
 					expect(typeof result).toBe('boolean');
 				} catch (error) {
 					// Expected in test environment
@@ -120,11 +105,11 @@ describe('Activities Utility Functions', () => {
 		it('should handle getActivities function', async () => {
 			const { getActivities } = await import('../../../src/util/routes/activities');
 
-			const mockDB = (globalThis as any).mockBindings?.DB;
+			const mockBindings = (globalThis as any).mockBindings;
 
-			if (mockDB) {
+			if (mockBindings) {
 				try {
-					const result = await getActivities(mockDB, 10, 0, 'test');
+					const result = await getActivities(mockBindings, 10, 0, 'test');
 					expect(Array.isArray(result)).toBe(true);
 				} catch (error) {
 					// Expected in test environment

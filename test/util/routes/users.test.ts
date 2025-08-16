@@ -20,7 +20,6 @@ describe('Users Utility Functions', () => {
 			expect(typeof users.getUserByUsername).toBe('function');
 			expect(typeof users.getUserByEmail).toBe('function');
 			expect(typeof users.doesUsernameExist).toBe('function');
-			expect(typeof users.init).toBe('function');
 			expect(typeof users.updateUser).toBe('function');
 			expect(typeof users.loginUser).toBe('function');
 			expect(typeof users.getAuthenticatedUserFromContext).toBe('function');
@@ -50,21 +49,6 @@ describe('Users Utility Functions', () => {
 			} catch (error) {
 				// Expected in test environment
 				expect(error).toBeDefined();
-			}
-		});
-
-		it('should handle checkTableExists function', async () => {
-			const { init: checkTableExists } = await import('../../../src/util/routes/users');
-
-			const mockDB = (globalThis as any).mockBindings?.DB;
-			if (mockDB) {
-				try {
-					const exists = await checkTableExists(mockDB);
-					expect(typeof exists).toBe('boolean');
-				} catch (error) {
-					// Expected in mock environment
-					expect(error).toBeDefined();
-				}
 			}
 		});
 
@@ -241,7 +225,7 @@ describe('Users Utility Functions', () => {
 					u.lastName = 'User';
 				});
 
-				const result = await patchUser(user, mockBindings, {
+				const result = await patchUser({ account: user, public: {} as any, database: {} as any }, mockBindings, {
 					firstName: 'Updated'
 				});
 				expect(result).toBeDefined();
@@ -263,7 +247,7 @@ describe('Users Utility Functions', () => {
 			} as any;
 
 			try {
-				const result = await deleteUser('test-id', mockBindings);
+				const result = await deleteUser('test-id', 'test-username', mockBindings);
 				expect(typeof result).toBe('boolean');
 			} catch (error) {
 				// Expected in test environment
