@@ -72,19 +72,7 @@ const regionCoords: Record<D1Region, { lat: number; lon: number }> = {
 	af: { lat: -26.2041, lon: 28.0473 } // Johannesburg
 };
 const R = 6371; // Earth's radius in kilometers
-const SHARD_BATCH_SIZE = 3; // how many shards to query at once for list endpoints
-
-function getShardBatchSize(tableName: string, limit: number, dbCount: number): number {
-	let base = SHARD_BATCH_SIZE;
-	const t = tableName.toLowerCase();
-	if (t === 'activities' || t === 'prompts')
-		base = 2; // smaller lists
-	else base = limit > 50 ? 4 : 3; // heavier tables
-
-	// Clamp and never exceed number of shards
-	base = Math.max(2, Math.min(base, 5));
-	return Math.min(base, Math.max(1, dbCount));
-}
+const SHARD_BATCH_SIZE = 10; // how many shards to query at once for list endpoints
 
 export function getSortedShards() {
 	if (!collegeDB || !currentRegion)
@@ -168,7 +156,7 @@ async function batchedCountUntil(
 ) {
 	let total = 0;
 	const counts: number[] = [];
-	const batchSize = getShardBatchSize(tableName, limitForBatching, dbs.length);
+	const batchSize = Math.min(SHARD_BATCH_SIZE, dbs.length);
 	for (let i = 0; i < dbs.length; i += batchSize) {
 		const batch = dbs.slice(i, i + batchSize);
 		const sql = whereClause
@@ -243,7 +231,7 @@ async function fetchTopFromShards<T>(
 	params: (string | number)[] = []
 ): Promise<T[]> {
 	let collected: T[] = [];
-	const batchSize = getShardBatchSize(tableName, limit, dbs.length);
+	const batchSize = Math.min(SHARD_BATCH_SIZE, dbs.length);
 	for (let i = 0; i < dbs.length && collected.length < limit; i += batchSize) {
 		const batch = dbs.slice(i, i + batchSize);
 		const remaining = Math.max(0, limit - collected.length);
