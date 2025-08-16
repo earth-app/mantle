@@ -103,73 +103,73 @@ export function ipRateLimit(config: RateLimitConfig) {
  * Predefined rate limit configurations
  */
 export const rateLimitConfigs = {
-	// 1 every 5 minutes per user
+	// 1 every 5 minutes per IP
 	userCreate: {
 		requests: 1,
 		windowMs: 5 * 60 * 1000, // 5 minutes
 		keyPrefix: 'rl:user:create'
 	},
-	// 3 every 1 minute per user
+	// 3 every 1 minute per IP
 	userLogin: {
 		requests: 3,
 		windowMs: 60 * 1000, // 1 minute
 		keyPrefix: 'rl:user:login'
 	},
-	// 10 every 1 minute per user
+	// 10 every 1 minute per IP
 	userUpdate: {
 		requests: 10,
 		windowMs: 60 * 1000, // 1 minute
 		keyPrefix: 'rl:user:update'
 	},
-	// 3 every 2 minutes per user
+	// 3 every 2 minutes per IP
 	eventCreate: {
 		requests: 3,
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:event:create'
 	},
-	// 5 every 2 minutes per user
+	// 5 every 2 minutes per IP
 	eventUpdate: {
 		requests: 5,
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:event:update'
 	},
-	// 10 every 3 minutes per user
+	// 10 every 3 minutes per IP
 	randomPromptRefresh: {
 		requests: 10,
 		windowMs: 3 * 60 * 1000, // 3 minutes
 		keyPrefix: 'rl:prompt:random:refresh'
 	},
-	// 7 every 2 minutes per user
+	// 7 every 2 minutes per IP
 	promptCreate: {
 		requests: 7,
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:prompt:create'
 	},
-	// 15 every 2 minutes per user
+	// 15 every 2 minutes per IP
 	promptUpdate: {
 		requests: 15,
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:prompt:update'
 	},
-	// 2 every 30 seconds per user
+	// 2 every 30 seconds per IP
 	promptResponseCreate: {
 		requests: 2,
 		windowMs: 30 * 1000, // 30 seconds
 		keyPrefix: 'rl:prompt:response'
 	},
-	// 1 every minute per user
+	// 1 every minute per IP
 	promptResponseUpdate: {
 		requests: 1,
 		windowMs: 60 * 1000, // 1 minute
 		keyPrefix: 'rl:prompt:response:update'
 	},
-	// 1 every 3 minutes per user
+	// 1 every 3 minutes per IP
 	articleCreate: {
 		requests: 1,
 		windowMs: 2 * 60 * 1000, // 3 minutes
 		keyPrefix: 'rl:article:create'
 	},
-	// 2 every 3 minutes per user
+	// 2 every 3 minutes per IP
 	articleUpdate: {
 		requests: 2,
 		windowMs: 3 * 60 * 1000, // 3 minutes

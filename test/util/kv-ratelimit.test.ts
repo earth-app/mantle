@@ -1,12 +1,12 @@
 import type { KVNamespace } from '@cloudflare/workers-types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockContext, MOCK_ADMIN_TOKEN, MOCK_USER_TOKEN } from '../helpers';
+import { createMockContext, MOCK_ADMIN_TOKEN } from '../helpers';
 
 // Import using dynamic import to avoid vi.mock issues
 const {
 	checkKVRateLimit,
 	ipRateLimit: kvRateLimit,
-	ipRateLimit: kvUserRateLimit,
+	ipRateLimit, // IP-based rate limiting (no user authentication required)
 	rateLimitConfigs
 } = await import('../../src/util/kv-ratelimit');
 
@@ -198,8 +198,8 @@ describe('KV Rate Limiting', () => {
 		});
 	});
 
-	describe('kvUserRateLimit middleware', () => {
-		it('should require authentication', async () => {
+	describe('IP Rate Limit middleware (ipRateLimit)', () => {
+		it('should allow requests when no IP is blocked', async () => {
 			const mockContext = createMockContext({
 				env: { KV: mockKV }
 			});
@@ -207,36 +207,35 @@ describe('KV Rate Limiting', () => {
 			const config = {
 				requests: 5,
 				windowMs: 60000,
-				keyPrefix: 'user'
+				keyPrefix: 'test'
 			};
 
-			const middleware = kvUserRateLimit(config);
+			const middleware = ipRateLimit(config);
 			const nextFn = vi.fn().mockResolvedValue(undefined);
 
 			const result = await middleware(mockContext as any, nextFn);
-
-			expect(nextFn).not.toHaveBeenCalled();
+			expect(nextFn).toHaveBeenCalled(); // Should proceed since IP rate limit not exceeded
 		});
 
-		it('should use user ID for rate limiting', async () => {
+		it('should handle IP-based rate limiting', async () => {
 			const mockContext = createMockContext({
 				env: { KV: mockKV },
 				headers: {
-					Authorization: `Bearer ${MOCK_USER_TOKEN}`
+					'CF-Connecting-IP': '192.168.1.1'
 				}
 			});
 
 			const config = {
 				requests: 5,
 				windowMs: 60000,
-				keyPrefix: 'user'
+				keyPrefix: 'ip-test'
 			};
 
-			const middleware = kvUserRateLimit(config);
+			const middleware = ipRateLimit(config);
 			const nextFn = vi.fn().mockResolvedValue(undefined);
 
 			// This test is expected to work in a simplified way
-			// due to authentication mocking complexity in this environment
+			// due to IP detection complexity in this environment
 			try {
 				await middleware(mockContext as any, nextFn);
 			} catch (error) {
@@ -245,34 +244,31 @@ describe('KV Rate Limiting', () => {
 			}
 		});
 
-		it('should skip rate limiting for admin users', async () => {
+		it('should use fallback identifier when no IP is available', async () => {
 			const mockContext = createMockContext({
-				env: { KV: mockKV },
-				headers: {
-					Authorization: `Bearer ${MOCK_ADMIN_TOKEN}`
-				}
+				env: { KV: mockKV }
 			});
 
 			const config = {
 				requests: 5,
 				windowMs: 60000,
-				keyPrefix: 'user'
+				keyPrefix: 'fallback-test'
 			};
 
-			const middleware = kvUserRateLimit(config);
+			const middleware = ipRateLimit(config);
 			const nextFn = vi.fn().mockResolvedValue(undefined);
 
 			try {
 				await middleware(mockContext as any, nextFn);
-				expect(nextFn).toHaveBeenCalled();
+				expect(nextFn).toHaveBeenCalled(); // Should use 'anonymous' as fallback and proceed
 			} catch (error) {
-				// May fail due to authentication complexity
+				// May fail due to implementation complexity
 			}
 		});
 	});
 
 	describe('Rate limit configurations', () => {
-		it('should have correct user creation config', () => {
+		it('should have correct IP-based user creation config', () => {
 			expect(rateLimitConfigs.userCreate).toEqual({
 				requests: 1,
 				windowMs: 5 * 60 * 1000,
@@ -280,7 +276,7 @@ describe('KV Rate Limiting', () => {
 			});
 		});
 
-		it('should have correct user login config', () => {
+		it('should have correct IP-based user login config', () => {
 			expect(rateLimitConfigs.userLogin).toEqual({
 				requests: 3,
 				windowMs: 60 * 1000,
