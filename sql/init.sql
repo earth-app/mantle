@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_tokens_expires_at ON tokens (expires_at);
 CREATE TABLE IF NOT EXISTS events (
     id TEXT PRIMARY KEY NOT NULL UNIQUE,
     binary BLOB NOT NULL,
-    hostId TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    hostId TEXT NOT NULL,
     name TEXT NOT NULL,
     attendees TEXT NOT NULL,
     latitude DOUBLE,
@@ -89,10 +89,9 @@ CREATE TABLE IF NOT EXISTS prompt_responses (
     owner_id TEXT NOT NULL,
     response TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (prompt_id) REFERENCES prompts(id)
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_prompt_responses_prompt_id ON prompt_responses(prompt_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_responses_prompt_id ON prompt_responses(prompt_id);
 CREATE INDEX IF NOT EXISTS idx_prompt_responses_owner_id ON prompt_responses(owner_id);
 CREATE INDEX IF NOT EXISTS idx_prompt_responses_response ON prompt_responses(response);
 CREATE INDEX IF NOT EXISTS idx_prompt_responses_created_at ON prompt_responses(created_at);

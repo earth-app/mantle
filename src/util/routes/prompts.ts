@@ -247,14 +247,14 @@ export async function savePromptResponse(prompt: Prompt, response: PromptRespons
 			response.response
 		]);
 		if (result.error) {
-			throw new HTTPException(500, { message: `Failed to save prompt response: ${result.error}` });
+			throw new DBError(`Failed to save prompt response: ${result.error}`);
 		}
 
 		response.created_at = new Date();
 		response.updated_at = new Date();
 		return response;
 	} catch (error) {
-		throw new HTTPException(400, { message: `Failed to create prompt response: ${error}` });
+		throw new DBError(`Failed to create prompt response: ${error}`);
 	}
 }
 
