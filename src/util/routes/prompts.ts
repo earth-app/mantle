@@ -1,10 +1,10 @@
-import { all, allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run, runAllShards } from '@earth-app/collegedb';
+import { all, allAllShards, createSchemaAcrossShards, first, KVShardMapper, run, runAllShards } from '@earth-app/collegedb';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { DBError } from '../../types/errors';
 import { Prompt, PromptResponse } from '../../types/prompts';
-import { collegeDB, init } from '../collegedb';
+import { collegeDB, getAllInTable, getAllInTableWithFilter, getCountInTable, init } from '../collegedb';
 import * as cache from './cache';
 import { getUserById } from './users';
 
@@ -315,24 +315,8 @@ export async function deletePromptResponse(id: string, bindings: Bindings): Prom
 export async function getPrompts(bindings: Bindings, limit: number = 25, page: number = 0, search: string = ''): Promise<Prompt[]> {
 	const cacheKey = `prompts:${limit}:${page}:${search.trim().toLowerCase()}`;
 	return cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		await init(bindings);
-
 		const offset = page * limit;
-		const searchQuery = search ? ' WHERE prompt LIKE ?' : '';
-		const query = `SELECT * FROM prompts${searchQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-		const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
-
-		const results = await allAllShards<Prompt>(query, params);
-
-		const allPrompts: Prompt[] = [];
-		results.forEach((result) => {
-			allPrompts.push(...result.results);
-		});
-
-		allPrompts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-		const paginatedPrompts = allPrompts.slice(offset, offset + limit);
-		return await Promise.all(paginatedPrompts);
+		return await getAllInTable<Prompt>(bindings, 'prompts', 'created_at DESC', limit, offset, 'prompt', search);
 	});
 }
 
@@ -340,7 +324,7 @@ export async function getRandomPrompts(bindings: Bindings, limit: number = 10): 
 	await init(bindings);
 
 	const query = `SELECT * FROM prompts ORDER BY RANDOM() LIMIT ?`;
-	const results = await allAllShards<Prompt>(query, [limit]); // Fetch slightly more than needed to ensure enough random prompts
+	const results = await allAllShards<Prompt>(query, [limit]);
 
 	const allPrompts: Prompt[] = [];
 	results.forEach((result) => {
@@ -358,14 +342,7 @@ export async function getPromptsCount(bindings: Bindings, search: string = ''): 
 	const cacheKey = `prompts:count:${search.trim().toLowerCase()}`;
 
 	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		await init(bindings);
-		const query = `SELECT COUNT(*) as count FROM prompts${search ? ' WHERE prompt LIKE ?' : ''}`;
-		const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-		const result = await firstAllShards<{ count: number }>(query, params);
-
-		if (!result || result.length === 0) return 0;
-
-		return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+		return await getCountInTable(bindings, 'prompts', 'prompt', search);
 	});
 }
 
@@ -388,14 +365,19 @@ export async function getPromptResponses(
 	page: number = 0,
 	search: string = ''
 ): Promise<PromptResponse[]> {
-	const query = `SELECT * FROM prompt_responses WHERE prompt_id = ?${search ? ' AND response LIKE ?' : ''} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-	let results: PromptResponse[];
+	const offset = page * limit;
 
-	if (search)
-		results = await findPromptResponse(query, com.earthapp.account.Privacy.PUBLIC, bindings, promptId, `%${search}%`, limit, page * limit);
-	else results = await findPromptResponse(query, com.earthapp.account.Privacy.PUBLIC, bindings, promptId, limit, page * limit);
-
-	return results;
+	return await getAllInTableWithFilter<PromptResponse>(
+		bindings,
+		'prompt_responses',
+		'created_at DESC',
+		limit,
+		offset,
+		'prompt_id',
+		promptId,
+		search ? 'response' : undefined,
+		search || undefined
+	);
 }
 
 export async function getPromptResponseById(

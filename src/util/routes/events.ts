@@ -1,13 +1,13 @@
 import { Event, EventObject, toEvent } from '../../types/events';
 import { haversineDistance } from '../util';
 
-import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
+import { allAllShards, createSchemaAcrossShards, first, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { DBError, ValidationError } from '../../types/errors';
-import { collegeDB, init } from '../collegedb';
+import { collegeDB, getAllInTable, getAllInTableWithFilter, getCountInTable, init } from '../collegedb';
 import * as cache from './cache';
 
 // Helpers
@@ -219,24 +219,8 @@ export async function getEvents(bindings: Bindings, limit: number = 25, page: nu
 
 	return (
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-			await init(bindings);
-
 			const offset = page * limit;
-			const searchQuery = search ? ' WHERE name LIKE ?' : '';
-			const query = `SELECT * FROM events${searchQuery} ORDER BY date DESC LIMIT ? OFFSET ?`;
-			const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
-
-			const results = await allAllShards<DBEvent>(query, params);
-
-			const allEvents: DBEvent[] = [];
-			results.forEach((result) => {
-				allEvents.push(...result.results);
-			});
-
-			allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-			const paginatedEvents = allEvents.slice(offset, offset + limit);
-			return await Promise.all(paginatedEvents);
+			return await getAllInTable<DBEvent>(bindings, 'events', 'created_at DESC', limit, offset, 'name', search);
 		})
 	)
 		.map((event) => toEventObject(event))
@@ -244,14 +228,12 @@ export async function getEvents(bindings: Bindings, limit: number = 25, page: nu
 }
 
 export async function getEventsCount(bindings: Bindings, search: string = ''): Promise<number> {
-	await init(bindings);
-	const query = `SELECT COUNT(*) as count FROM events${search ? ' WHERE name LIKE ?' : ''}`;
-	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await firstAllShards<{ count: number }>(query, params);
+	const cacheKey = `events:count:${search.trim().toLowerCase()}`;
 
-	if (!result || result.length === 0) return 0;
-
-	return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
+		return await getCountInTable(bindings, 'events', 'name', search);
+	});
 }
 
 export async function getEventsInside(
@@ -269,21 +251,24 @@ export async function getEventsInside(
 			const latRange = radius / 111.32; // roughly 1 degree latitude = 111.32 km
 			const lonRange = radius / (111.32 * Math.cos((latitude * Math.PI) / 180));
 
+			await init(bindings);
+
+			// Use custom query for geospatial bounding box, but use allAllShards for consistency
 			const boundingBoxQuery = `SELECT * FROM events WHERE
         latitude IS NOT NULL AND longitude IS NOT NULL AND
         latitude BETWEEN ? AND ? AND
-        longitude BETWEEN ? AND ? LIMIT ? OFFSET ?`;
+        longitude BETWEEN ? AND ? ORDER BY created_at DESC LIMIT ? OFFSET ?`;
 
-			const candidateResults = await findEvent(
-				boundingBoxQuery,
-				bindings,
-				latitude - latRange,
-				latitude + latRange,
-				longitude - lonRange,
-				longitude + lonRange,
-				limit,
-				page * limit
-			);
+			const candidateResults = (
+				await allAllShards<DBEvent>(boundingBoxQuery, [
+					latitude - latRange,
+					latitude + latRange,
+					longitude - lonRange,
+					longitude + lonRange,
+					limit * 2, // Get more candidates to account for distance filtering
+					page * limit
+				])
+			).flatMap((row) => row.results);
 
 			if (candidateResults.length === 0) return [];
 
@@ -295,7 +280,8 @@ export async function getEventsInside(
 				return distance <= radius;
 			});
 
-			return filteredResults;
+			// Return only the requested limit after distance filtering
+			return filteredResults.slice(0, limit);
 		})
 	)
 		.map((event) => toEventObject(event))
@@ -329,8 +315,8 @@ export async function getEventsByHostId(hostId: string, bindings: Bindings, limi
 	const cacheKey = `events:host:${hostId}:${limit}:${page}`;
 	return (
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-			const query = 'SELECT * FROM events WHERE hostId = ? LIMIT ? OFFSET ?';
-			return await findEvent(query, bindings, hostId, limit, page * limit);
+			const offset = page * limit;
+			return await getAllInTableWithFilter<DBEvent>(bindings, 'events', 'created_at DESC', limit, offset, 'hostId', hostId);
 		})
 	)
 		.map((event) => toEventObject(event))
@@ -351,20 +337,22 @@ export async function getEventsByAttendees(
 	const cacheKey = `events:attendees:${attendees.join(',')}:${limit}:${page}:${search}`;
 	return (
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-			const query = `SELECT * FROM events WHERE attendees IS NOT NULL ${
-				search ? `WHERE name LIKE ? ` : ''
-			}AND JSON_EXTRACT(attendees, ?) IS NOT NULL LIMIT ? OFFSET ?`;
-			let results: DBEvent[];
-			if (search) results = await findEvent(query, bindings, `%${search}%`, `$.${attendees.join(',$.')}`, limit, page * limit);
-			else results = await findEvent(query, bindings, `$.${attendees.join(',$.')}`, limit, page * limit);
-			if (results.length === 0) return [];
+			const offset = page * limit;
+			const extendedLimit = limit * 3; // Get more results to filter down
 
-			// Verify attendees against the event's attendees
-			// This is necessary because JSON_EXTRACT can return events with empty or mismatched attendees
-			return results.filter((event) => {
+			let allEvents: DBEvent[];
+			if (search) {
+				allEvents = await getAllInTable<DBEvent>(bindings, 'events', 'created_at DESC', extendedLimit, offset, 'name', search);
+			} else {
+				allEvents = await getAllInTable<DBEvent>(bindings, 'events', 'created_at DESC', extendedLimit, offset);
+			}
+
+			const filteredEvents = allEvents.filter((event) => {
 				const eventAttendees = event.attendees || [];
 				return attendees.some((attendee) => eventAttendees.includes(attendee) || event.hostId === attendee);
 			});
+
+			return filteredEvents.slice(0, limit);
 		})
 	)
 		.map((event) => toEventObject(event))

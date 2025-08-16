@@ -6,13 +6,13 @@ import { addSession, getOwnerOfBearer, getOwnerOfToken } from '../authentication
 import * as encryption from '../encryption';
 import * as util from '../util';
 
-import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
+import { createSchemaAcrossShards, first, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com } from '@earth-app/ocean';
 import { Context } from 'hono';
 import { ActivityObject } from '../../types/activities';
 import { DBError, ValidationError } from '../../types/errors';
-import { collegeDB, init } from '../collegedb';
+import { collegeDB, getAllInTable, getCountInTable, init } from '../collegedb';
 import * as cache from './cache';
 
 // Helpers
@@ -437,23 +437,9 @@ export async function getUsers(
 	search: string = '',
 	fieldPrivacy: com.earthapp.account.Privacy = com.earthapp.account.Privacy.PUBLIC
 ): Promise<UserObject[]> {
-	await init(bindings);
-
 	const offset = page * limit;
-	const searchQuery = search ? ' WHERE username LIKE ?' : '';
-	const query = `SELECT * FROM users${searchQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-	const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
+	const paginatedUsers = await getAllInTable<DBUser>(bindings, 'users', 'created_at DESC', limit, offset, 'username', search);
 
-	const results = await allAllShards<DBUser>(query, params);
-
-	const allUsers: DBUser[] = [];
-	results.forEach((result) => {
-		allUsers.push(...result.results);
-	});
-
-	allUsers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-	const paginatedUsers = allUsers.slice(offset, offset + limit);
 	return await Promise.all(paginatedUsers.map(async (row) => await toUserObject(row, fieldPrivacy, bindings)));
 }
 
@@ -461,14 +447,7 @@ export async function getUsersCount(bindings: Bindings, search: string = ''): Pr
 	const cacheKey = `users:count:${search.trim().toLowerCase()}`;
 
 	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		await init(bindings);
-		const query = `SELECT COUNT(*) as count FROM users${search ? ' WHERE username LIKE ?' : ''}`;
-		const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-		const result = await firstAllShards<{ count: number }>(query, params);
-
-		if (!result || result.length === 0) return 0;
-
-		return result.filter((r) => r != null).reduce((total, r) => total + (r.count || 0), 0);
+		return await getCountInTable(bindings, 'users', 'username', search);
 	});
 }
 

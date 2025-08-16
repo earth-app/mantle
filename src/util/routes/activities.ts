@@ -1,11 +1,11 @@
-import { allAllShards, createSchemaAcrossShards, first, firstAllShards, KVShardMapper, run } from '@earth-app/collegedb';
+import { allAllShards, createSchemaAcrossShards, first, KVShardMapper, run } from '@earth-app/collegedb';
 import * as ocean from '@earth-app/ocean';
 import { com, kotlin } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { Activity, ActivityObject, toActivity } from '../../types/activities';
 import { DBError, ValidationError } from '../../types/errors';
-import { collegeDB, init } from '../collegedb';
+import { collegeDB, getAllInTable, getCountInTable, init } from '../collegedb';
 import * as cache from './cache';
 
 // Helpers
@@ -156,16 +156,6 @@ export async function deleteActivity(id: string, aliases: string[], bindings: Bi
 
 // Activity retrieval functions
 
-export async function getActivitiesCount(bindings: Bindings, search: string = ''): Promise<number> {
-	await init(bindings);
-
-	const query = `SELECT COUNT(*) as count FROM activities${search ? ' WHERE id LIKE ?' : ''}`;
-	const params = search ? [`%${search.trim().toLowerCase()}%`] : [];
-	const result = await firstAllShards<{ count: number }>(query, params);
-
-	return result.filter((row) => row != null).reduce((sum, row) => sum + row.count, 0);
-}
-
 export async function getActivities(
 	bindings: Bindings,
 	limit: number = 25,
@@ -176,35 +166,34 @@ export async function getActivities(
 
 	return (
 		await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-			await init(bindings);
-
 			const offset = page * limit;
-			const searchQuery = search ? ' WHERE id LIKE ?' : '';
-			const query = `SELECT * FROM activities${searchQuery} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-			const params = search ? [`%${search.trim().toLowerCase()}%`, limit, offset] : [limit, offset];
-
-			const results = await allAllShards<DBActivity>(query, params);
-
-			const allActivities: DBActivity[] = [];
-			results.forEach((result) => {
-				allActivities.push(...result.results);
-			});
-
-			allActivities.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-			const paginatedPrompts = allActivities.slice(offset, offset + limit);
-			return await Promise.all(paginatedPrompts);
+			return await getAllInTable<DBActivity>(bindings, 'activities', 'created_at DESC', limit, offset, 'id', search);
 		})
 	)
 		.map((activity) => toActivityObject(activity))
 		.filter((activity) => activity !== null);
 }
 
-export async function getRandomActivities(bindings: Bindings, limit: number = 25): Promise<ActivityObject[]> {
-	const query = `SELECT * FROM activities ORDER BY RANDOM() LIMIT ?`;
-	const results = await findActivity(query, bindings, limit);
+export async function getActivitiesCount(bindings: Bindings, search: string = ''): Promise<number> {
+	const cacheKey = `activities:count:${search.trim().toLowerCase()}`;
 
-	return results.map((activity) => toActivityObject(activity)).filter((activity) => activity !== null);
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
+		return await getCountInTable(bindings, 'activities', 'id', search);
+	});
+}
+
+export async function getRandomActivities(bindings: Bindings, limit: number = 25): Promise<ActivityObject[]> {
+	await init(bindings);
+
+	// Use allAllShards to get random activities from all shards
+	const query = `SELECT * FROM activities ORDER BY RANDOM() LIMIT ?`;
+	const results = (await allAllShards<DBActivity>(query, [limit])).flatMap((row) => row.results);
+
+	// Shuffle and limit the results to ensure randomness across shards
+	const shuffled = results.sort(() => Math.random() - 0.5).slice(0, limit);
+
+	return shuffled.map((activity) => toActivityObject(activity)).filter((activity) => activity !== null);
 }
 
 export async function doesActivityExist(id: string, bindings: Bindings): Promise<boolean> {
