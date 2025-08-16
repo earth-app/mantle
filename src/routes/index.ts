@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import healthCheck from './health';
 import hello from './hello';
 import info from './info';
+import shardInfo from './shard_info';
 
 import activities from './activities';
 import articles from './articles';
@@ -16,6 +17,7 @@ const routes = new Hono();
 
 routes.route('/hello', hello);
 routes.route('/info', info);
+routes.route('/shard_info', shardInfo);
 routes.route('/health_check', healthCheck);
 
 routes.route('/users', users);
