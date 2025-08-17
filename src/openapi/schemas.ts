@@ -5,7 +5,6 @@ import z from 'zod';
 import 'zod-openapi/extend';
 
 import { DescribeRouteOptions } from 'hono-openapi';
-import { LoginUser } from '../types/users';
 
 // Root Types
 export function error(code: number, message: string) {
@@ -108,6 +107,10 @@ export const uuid = z.string().uuid().openapi({
 	example: '123e4567-e89b-12d3-a456-426614174000',
 	description: 'A valid UUID'
 });
+export const sessionToken = z
+	.string()
+	.length(com.earthapp.util.API_KEY_LENGTH)
+	.openapi({ example: '4bHN3nxwb21bd1sm109s1nan28xm1bab2Js18', description: 'The session token for the user' });
 
 export const usernameParam = {
 	type: 'string',
@@ -499,24 +502,27 @@ export const user = z
 	});
 export const users = z.array(user);
 
-export const loginResponse = z.custom<LoginUser>().openapi({
-	example: {
-		id: 'eb9137b1272938',
-		username: 'johndoe',
-		session_token: 'abc123xyz456'
-	}
+export const signupResponse = z.object({
+	user: user,
+	session_token: sessionToken
+});
+
+export const loginResponse = z.object({
+	id: id,
+	username: username,
+	session_token: sessionToken
 });
 
 export const logoutResponse = z
 	.object({
 		message: z.string().openapi({ example: 'Logout successful' }),
-		session: z.string().openapi({ example: 'abc123xyz456', description: 'The session token that was invalidated' }),
+		session_token: sessionToken,
 		user: user.optional()
 	})
 	.openapi({
 		example: {
 			message: 'Logout successful',
-			session: 'abc123xyz456'
+			session_token: 'abc123xyz456'
 		}
 	});
 

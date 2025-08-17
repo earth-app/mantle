@@ -55,7 +55,7 @@ logout.post(
 
 		// Invalidate the session
 		await removeSession(session, c.env);
-		return c.json({ message: 'Logout successful', session, user: user.public }, 200);
+		return c.json({ message: 'Logout successful', session_token: session, user: user.public }, 200);
 	}
 );
 
