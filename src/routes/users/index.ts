@@ -10,6 +10,7 @@ import * as tags from '../../openapi/tags';
 // User Routes
 import createUser from './create';
 import loginUser from './login';
+import logoutUser from './logout';
 import user from './user';
 
 // Implementation
@@ -60,6 +61,7 @@ users.get(
 );
 
 users.route('/login', loginUser);
+users.route('/logout', logoutUser);
 users.route('/create', createUser);
 
 users.get(

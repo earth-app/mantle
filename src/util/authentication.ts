@@ -137,7 +137,7 @@ export async function removeToken(token: string, bindings: Bindings) {
 		await mapper.deleteShardMapping(row.id);
 		await mapper.deleteShardMapping(`token-${lookupHash}`);
 
-		cache.clearCache(`session-count:${row.owner}`, bindings.KV_CACHE);
+		await cache.clearCache(`session-count:${row.owner}`, bindings.KV_CACHE);
 	}
 }
 

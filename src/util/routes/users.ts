@@ -237,7 +237,7 @@ export async function refreshUserActivities(activity: ActivityObject, bindings: 
 	}
 }
 
-// Login Function
+// Login & Logout Function
 
 // assume already authenticated via Basic Auth
 export async function loginUser(username: string, bindings: Bindings): Promise<LoginUser> {

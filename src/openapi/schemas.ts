@@ -507,6 +507,19 @@ export const loginResponse = z.custom<LoginUser>().openapi({
 	}
 });
 
+export const logoutResponse = z
+	.object({
+		message: z.string().openapi({ example: 'Logout successful' }),
+		session: z.string().openapi({ example: 'abc123xyz456', description: 'The session token that was invalidated' }),
+		user: user.optional()
+	})
+	.openapi({
+		example: {
+			message: 'Logout successful',
+			session: 'abc123xyz456'
+		}
+	});
+
 export const event = z
 	.object({
 		id: id,
@@ -595,7 +608,7 @@ export const promptResponse = z
 	.object({
 		id: uuid,
 		prompt_id: uuid,
-		response: text,
+		response: text.max(700),
 		created_at: date,
 		updated_at: date.optional()
 	})
