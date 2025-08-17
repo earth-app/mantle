@@ -93,8 +93,18 @@ export const paginatedParams = z.object({
 // String Types
 export const text = z.string().openapi({ example: 'Hello World' });
 export const id = z.string().length(com.earthapp.util.ID_LENGTH).openapi({ example: 'ebfjwHLdiqBudn3eyd83g1bs' });
-export const username = z.string().min(4).max(20).openapi({ example: 'johndoe' });
-export const password = z.string().min(8).max(100).openapi({ example: 'password123' });
+export const username = z
+	.string()
+	.min(3, 'Must be at least 3 characters')
+	.max(30, 'Must be at most 30 characters')
+	.regex(/^[a-zA-Z0-9_.-]+$/, 'Only alphanumeric characters, underscores, dashes, and periods are allowed')
+	.openapi({ example: 'johndoe' });
+export const password = z
+	.string()
+	.min(8)
+	.max(100)
+	.regex(/^[a-zA-Z0-9!@#$%^&*()_+={}\[\]:;"'<>,.?\/\\|-]+$/, 'Invalid characters in password')
+	.openapi({ example: 'password123' });
 export const email = z.string().email().openapi({ example: 'me@company.com' });
 export const date = z.string().datetime().openapi({ example: '2025-05-11T10:00:00Z' });
 export const hexCode = z
@@ -165,7 +175,7 @@ export const idArray = z.array(id).openapi({
 export const userCreate = z.object({
 	username: username,
 	password: password,
-	email: email,
+	email: email.optional(),
 	firstName: z.string().min(1).max(30).optional(),
 	lastName: z.string().min(1).max(30).optional()
 });
