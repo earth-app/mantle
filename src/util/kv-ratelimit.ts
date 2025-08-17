@@ -133,6 +133,12 @@ export const rateLimitConfigs = {
 		windowMs: 2 * 60 * 1000, // 2 minutes
 		keyPrefix: 'rl:event:update'
 	},
+	// 25 every 5 minutes per IP
+	randomActivityRefresh: {
+		requests: 25,
+		windowMs: 5 * 60 * 1000, // 5 minutes
+		keyPrefix: 'rl:activity:random:refresh'
+	},
 	// 10 every 3 minutes per IP
 	randomPromptRefresh: {
 		requests: 10,
