@@ -230,10 +230,7 @@ export async function getEvents(bindings: Bindings, limit: number = 25, page: nu
 export async function getEventsCount(bindings: Bindings, search: string = ''): Promise<number> {
 	const cacheKey = `events:count:${search.trim().toLowerCase()}`;
 
-	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		await init(bindings);
-		return await getCountInTable(bindings, 'events', 'name', search);
-	});
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => await getCountInTable(bindings, 'events', 'name', search));
 }
 
 export async function getEventsInside(

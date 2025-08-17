@@ -177,10 +177,7 @@ export async function getActivities(
 export async function getActivitiesCount(bindings: Bindings, search: string = ''): Promise<number> {
 	const cacheKey = `activities:count:${search.trim().toLowerCase()}`;
 
-	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		await init(bindings);
-		return await getCountInTable(bindings, 'activities', 'id', search);
-	});
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => await getCountInTable(bindings, 'activities', 'id', search));
 }
 
 export async function getRandomActivities(bindings: Bindings, limit: number = 25): Promise<ActivityObject[]> {

@@ -446,9 +446,7 @@ export async function getUsers(
 export async function getUsersCount(bindings: Bindings, search: string = ''): Promise<number> {
 	const cacheKey = `users:count:${search.trim().toLowerCase()}`;
 
-	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		return await getCountInTable(bindings, 'users', 'username', search);
-	});
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => await getCountInTable(bindings, 'users', 'username', search));
 }
 
 export async function doesUsernameExist(username: string, bindings: Bindings): Promise<boolean> {

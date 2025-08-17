@@ -1,10 +1,10 @@
-import { all, allAllShards, createSchemaAcrossShards, first, KVShardMapper, run, runAllShards } from '@earth-app/collegedb';
+import { allAllShards, createSchemaAcrossShards, first, KVShardMapper, run, runAllShards } from '@earth-app/collegedb';
 import { com } from '@earth-app/ocean';
 import { HTTPException } from 'hono/http-exception';
 import Bindings from '../../bindings';
 import { DBError } from '../../types/errors';
 import { Prompt, PromptResponse } from '../../types/prompts';
-import { collegeDB, getAllInTable, getAllInTableWithFilter, getCountInTable, init } from '../collegedb';
+import { collegeDB, getAllInTable, getAllInTableWithFilter, getCountInTable, getCountInTableWithFilter, init } from '../collegedb';
 import * as cache from './cache';
 import { getUserById } from './users';
 
@@ -95,43 +95,6 @@ export async function healthCheck(bindings: Bindings) {
 	}
 
 	return true;
-}
-
-async function findPrompt(id: string, query: string, bindings: Bindings, ...params: any[]): Promise<Prompt[]> {
-	await init(bindings);
-
-	const row = await all<Prompt>(id, query, params);
-	if (row.error) {
-		throw new HTTPException(500, { message: `Failed to find prompts: ${row.error}` });
-	}
-
-	return row.results;
-}
-
-async function findPromptResponse(
-	query: string,
-	ownerPrivacy: com.earthapp.account.Privacy,
-	bindings: Bindings,
-	...params: any[]
-): Promise<PromptResponse[]> {
-	await init(bindings);
-
-	const results = (await allAllShards<PromptResponse>(query, params)).flatMap((row) => row.results);
-
-	return Promise.all(
-		results.map(async (response) => {
-			if (!response.owner_id) return response;
-
-			const owner = await getUserById(response.owner_id, bindings, ownerPrivacy);
-			if (!owner) return response;
-
-			if (owner.account.visibility === com.earthapp.Visibility.PRIVATE || owner.account.isFieldPrivate('promptResponses', ownerPrivacy)) {
-				response.owner_id = undefined; // Hide owner ID if privacy settings require it
-			}
-
-			return response;
-		})
-	);
 }
 
 export async function savePrompt(prompt: Prompt, bindings: Bindings): Promise<Prompt> {
@@ -252,6 +215,8 @@ export async function savePromptResponse(prompt: Prompt, response: PromptRespons
 
 		response.created_at = new Date();
 		response.updated_at = new Date();
+
+		await cache.clearCachePrefix(`prompt_responses:${prompt.id}`, bindings.KV_CACHE);
 		return response;
 	} catch (error) {
 		throw new DBError(`Failed to create prompt response: ${error}`);
@@ -278,7 +243,7 @@ export async function updatePromptResponse(id: string, response: PromptResponse,
 		const obj = { ...response, id };
 
 		const cacheKey = `prompt_response:${id}`;
-		cache.cache(cacheKey, obj, bindings.KV_CACHE);
+		await cache.clearCache(cacheKey, bindings.KV_CACHE);
 
 		return obj;
 	} catch (error) {
@@ -340,10 +305,7 @@ export async function getRandomPrompts(bindings: Bindings, limit: number = 10): 
 
 export async function getPromptsCount(bindings: Bindings, search: string = ''): Promise<number> {
 	const cacheKey = `prompts:count:${search.trim().toLowerCase()}`;
-
-	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
-		return await getCountInTable(bindings, 'prompts', 'prompt', search);
-	});
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => await getCountInTable(bindings, 'prompts', 'prompt', search));
 }
 
 export async function getPromptById(id: string, bindings: Bindings): Promise<Prompt | null> {
@@ -351,8 +313,9 @@ export async function getPromptById(id: string, bindings: Bindings): Promise<Pro
 
 	return cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
 		const query = `SELECT * FROM prompts WHERE id = ?`;
-		const prompts = await findPrompt(id, query, bindings, id);
-		return prompts.length > 0 ? prompts[0] : null;
+		const prompt = await first<Prompt>(id, query, [id]);
+		if (!prompt) return null;
+		return prompt;
 	});
 }
 
@@ -365,18 +328,39 @@ export async function getPromptResponses(
 	page: number = 0,
 	search: string = ''
 ): Promise<PromptResponse[]> {
-	const offset = page * limit;
+	const cacheKey = `prompt_responses:${promptId}:${limit}:${page}:${search.trim().toLowerCase()}`;
 
-	return await getAllInTableWithFilter<PromptResponse>(
-		bindings,
-		'prompt_responses',
-		'created_at DESC',
-		limit,
-		offset,
-		'prompt_id',
-		promptId,
-		search ? 'response' : undefined,
-		search || undefined
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		const offset = page * limit;
+		return await getAllInTableWithFilter<PromptResponse>(
+			bindings,
+			'prompt_responses',
+			'created_at DESC',
+			limit,
+			offset,
+			'prompt_id',
+			promptId,
+			search ? 'response' : undefined,
+			search || undefined
+		);
+	});
+}
+
+export async function getPromptResponsesCount(promptId: string, bindings: Bindings, search: string = ''): Promise<number> {
+	const cacheKey = `prompt_responses:${promptId}:count:${search.trim().toLowerCase()}`;
+
+	return await cache.tryCache(
+		cacheKey,
+		bindings.KV_CACHE,
+		async () =>
+			await getCountInTableWithFilter(
+				bindings,
+				'prompt_responses',
+				'prompt_id',
+				promptId,
+				search ? 'response' : undefined,
+				search || undefined
+			)
 	);
 }
 
@@ -385,21 +369,24 @@ export async function getPromptResponseById(
 	bindings: Bindings,
 	ownerPrivacy: com.earthapp.account.Privacy
 ): Promise<PromptResponse | null> {
-	await init(bindings);
+	const cacheKey = `prompt_response:${id}`;
+	return await cache.tryCache(cacheKey, bindings.KV_CACHE, async () => {
+		await init(bindings);
 
-	const query = `SELECT * FROM prompt_responses WHERE id = ?`;
-	const response = await first<PromptResponse>(id, query, [id]);
+		const query = `SELECT * FROM prompt_responses WHERE id = ?`;
+		const response = await first<PromptResponse>(id, query, [id]);
 
-	if (!response) return null;
+		if (!response) return null;
 
-	if (response.owner_id) {
-		const owner = await getUserById(response.owner_id, bindings, ownerPrivacy);
-		if (!owner) return response;
+		if (response.owner_id) {
+			const owner = await getUserById(response.owner_id, bindings, ownerPrivacy);
+			if (!owner) return response;
 
-		if (owner.account.visibility === com.earthapp.Visibility.PRIVATE || owner.account.isFieldPrivate('promptResponses', ownerPrivacy)) {
-			response.owner_id = undefined; // Hide owner ID if privacy settings require it
+			if (owner.account.visibility === com.earthapp.Visibility.PRIVATE || owner.account.isFieldPrivate('promptResponses', ownerPrivacy)) {
+				response.owner_id = undefined; // Hide owner ID if privacy settings require it
+			}
 		}
-	}
 
-	return response;
+		return response;
+	});
 }
