@@ -103,7 +103,10 @@ activities.get(
 		}
 
 		const activities = await getRandomActivities(c.env, limit);
-		return c.json(activities, 200);
+		return c.json(
+			activities.map((activity) => activity.public),
+			200
+		);
 	}
 );
 
