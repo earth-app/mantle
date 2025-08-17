@@ -70,6 +70,7 @@ createUser.post(
 
 		const user = users.createUser(username, (user) => {
 			// user.email = email;
+			user.email = ''; // TODO: Implement email verification
 
 			if (firstName) user.firstName = firstName;
 			if (lastName) user.lastName = lastName;

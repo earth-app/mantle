@@ -103,9 +103,9 @@ export function ipRateLimit(config: RateLimitConfig) {
  * Predefined rate limit configurations
  */
 export const rateLimitConfigs = {
-	// 1 every 5 minutes per IP
+	// 5 every 5 minutes per IP
 	userCreate: {
-		requests: 1,
+		requests: 5,
 		windowMs: 5 * 60 * 1000, // 5 minutes
 		keyPrefix: 'rl:user:create'
 	},
