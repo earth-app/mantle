@@ -284,7 +284,92 @@ prompt.get(
 		const { page, limit, search } = params;
 
 		const responses = await prompts.getPromptResponses(promptId, c.env, limit, page - 1, search);
-		return c.json(responses, 200);
+		const count = await prompts.getPromptResponsesCount(promptId, c.env, search);
+		return c.json(
+			{
+				page: page,
+				limit: limit,
+				total: count,
+				items: responses
+			},
+			200
+		);
+	}
+);
+
+// Get Prompt Responses Count
+prompt.get(
+	'/responses/count',
+	validateMiddleware('param', z.object({ promptId: schemas.uuid })),
+	describeRoute({
+		summary: 'Get the count of prompt responses',
+		description: 'Retrieves the total number of responses for a specific prompt.',
+		parameters: [
+			{
+				name: 'promptId',
+				in: 'path',
+				required: true,
+				schema: schemas.uuidParam
+			},
+			{
+				name: 'search',
+				in: 'query',
+				description: 'Search query (max 40 characters)',
+				required: false,
+				schema: {
+					type: 'string',
+					maxLength: 40,
+					default: ''
+				}
+			}
+		],
+		responses: {
+			200: {
+				description: 'Count of prompt responses, with prompt object',
+				content: {
+					'application/json': {
+						schema: resolver(
+							z.object({
+								count: z.number().int().nonnegative(),
+								prompt: schemas.prompt
+							})
+						)
+					}
+				}
+			},
+			400: schemas.badRequest,
+			404: {
+				description: 'Prompt not found'
+			}
+		},
+		tags: [tags.PROMPTS]
+	}),
+	async (c) => {
+		const { promptId } = c.req.valid('param');
+		const search = c.req.query('search') || '';
+		if (!search || search.length > 40) {
+			return c.json(
+				{
+					code: 400,
+					message: 'Search query must be a string with a maximum length of 40 characters.'
+				},
+				400
+			);
+		}
+
+		const prompt = await prompts.getPromptById(promptId, c.env);
+		if (!prompt) {
+			return c.json(
+				{
+					code: 404,
+					message: `Prompt with ID ${promptId} not found`
+				},
+				404
+			);
+		}
+
+		const count = await prompts.getPromptResponsesCount(promptId, c.env, search);
+		return c.json({ count, prompt }, 200);
 	}
 );
 
