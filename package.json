@@ -16,7 +16,7 @@
   "dependencies": {
     "@cloudflare/workers-types": "^4.20250816.0",
     "@earth-app/collegedb": "^1.0.8",
-    "@earth-app/ocean": "1.0.0-ab998d7",
+    "@earth-app/ocean": "1.0.0-b5dff451d6ae3e4690c004a0738d0c60a523407b",
     "@hono-rate-limiter/cloudflare": "^0.2.2",
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-validator": "^0.7.2",
