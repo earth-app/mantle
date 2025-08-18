@@ -6,7 +6,7 @@
       "dependencies": {
         "@cloudflare/workers-types": "^4.20250816.0",
         "@earth-app/collegedb": "^1.0.8",
-        "@earth-app/ocean": "1.0.0-ab998d7",
+        "@earth-app/ocean": "1.0.0-b5dff45",
         "@hono-rate-limiter/cloudflare": "^0.2.2",
         "@hono/swagger-ui": "^0.5.2",
         "@hono/zod-validator": "^0.7.2",
@@ -25,7 +25,7 @@
         "@vitest/coverage-v8": "^3.2.4",
         "husky": "^9.1.7",
         "prettier": "^3.6.2",
-        "prettier-plugin-organize-imports": "4.1.0",
+        "prettier-plugin-organize-imports": "4.2.0",
         "vitest": "~3.2.4",
         "wrangler": "^4.30.0",
       },
@@ -68,7 +68,7 @@
 
     "@earth-app/collegedb": ["@earth-app/collegedb@1.0.8", "https://npm.pkg.github.com/download/@earth-app/collegedb/1.0.8/a175064485ffed04a17f95bd60c1cd1abfd5ab8e", { "dependencies": { "@cloudflare/workers-types": "^4.20250726.0" }, "peerDependencies": { "typescript": "^5" } }, "sha512-t3n3p2Q6F0319RkFTiDOJBu5/fLDQEoQTc9XFkgyWIG6I6Fupg2GHuX7yFhQ7EF9Cw/OXOGAsVBe7zKYKsKnug=="],
 
-    "@earth-app/ocean": ["@earth-app/ocean@1.0.0-ab998d7", "https://npm.pkg.github.com/download/@earth-app/ocean/1.0.0-ab998d7/381fc7035833356edcb32e61b7f90924fcd2e9a7", { "dependencies": { "rss-parser": "^3.13.0", "ws": "8.18.0" } }, "sha512-uJxJhqdtYu9lec51ldQZWQqrgSHi0F02j1LKkEKB7I8kn0Jyc0QzXew8u4W919cWN/Vdn0i6r0L/Jy2LBXbQ9Q=="],
+    "@earth-app/ocean": ["@earth-app/ocean@1.0.0-b5dff45", "https://npm.pkg.github.com/download/@earth-app/ocean/1.0.0-b5dff45/82191f6a5591fe8befa831516a56591a7e41356e", { "dependencies": { "rss-parser": "^3.13.0", "ws": "8.18.0" } }, "sha512-/Dxz+vlYCgCABfVKWnmnjCBgbqSsxESzytpkvnL8FQVjCqWoNUYdvEnin76Ro9m6bTVcde5Spz5D6WrGNYYaJA=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.4.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-pBPWdu6MLKROBX05wSNKcNb++m5Er+KQ9QkB+WVM+pW2Kx9hoSrVTnu3BdkI5eBLZoKu/J6mW/B6i6bJB2ytXQ=="],
 
@@ -438,7 +438,7 @@
 
     "prettier": ["prettier@3.6.2", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ=="],
 
-    "prettier-plugin-organize-imports": ["prettier-plugin-organize-imports@4.1.0", "", { "peerDependencies": { "prettier": ">=2.0", "typescript": ">=2.9", "vue-tsc": "^2.1.0" }, "optionalPeers": ["vue-tsc"] }, "sha512-5aWRdCgv645xaa58X8lOxzZoiHAldAPChljr/MT0crXVOWTZ+Svl4hIWlz+niYSlO6ikE5UXkN1JrRvIP2ut0A=="],
+    "prettier-plugin-organize-imports": ["prettier-plugin-organize-imports@4.2.0", "", { "peerDependencies": { "prettier": ">=2.0", "typescript": ">=2.9", "vue-tsc": "^2.1.0 || 3" }, "optionalPeers": ["vue-tsc"] }, "sha512-Zdy27UhlmyvATZi67BTnLcKTo8fm6Oik59Sz6H64PgZJVs6NJpPD1mT240mmJn62c98/QaL+r3kx9Q3gRpDajg=="],
 
     "rollup": ["rollup@4.45.1", "", { "dependencies": { "@types/estree": "1.0.8" }, "optionalDependencies": { "@rollup/rollup-android-arm-eabi": "4.45.1", "@rollup/rollup-android-arm64": "4.45.1", "@rollup/rollup-darwin-arm64": "4.45.1", "@rollup/rollup-darwin-x64": "4.45.1", "@rollup/rollup-freebsd-arm64": "4.45.1", "@rollup/rollup-freebsd-x64": "4.45.1", "@rollup/rollup-linux-arm-gnueabihf": "4.45.1", "@rollup/rollup-linux-arm-musleabihf": "4.45.1", "@rollup/rollup-linux-arm64-gnu": "4.45.1", "@rollup/rollup-linux-arm64-musl": "4.45.1", "@rollup/rollup-linux-loongarch64-gnu": "4.45.1", "@rollup/rollup-linux-powerpc64le-gnu": "4.45.1", "@rollup/rollup-linux-riscv64-gnu": "4.45.1", "@rollup/rollup-linux-riscv64-musl": "4.45.1", "@rollup/rollup-linux-s390x-gnu": "4.45.1", "@rollup/rollup-linux-x64-gnu": "4.45.1", "@rollup/rollup-linux-x64-musl": "4.45.1", "@rollup/rollup-win32-arm64-msvc": "4.45.1", "@rollup/rollup-win32-ia32-msvc": "4.45.1", "@rollup/rollup-win32-x64-msvc": "4.45.1", "fsevents": "~2.3.2" }, "bin": { "rollup": "dist/bin/rollup" } }, "sha512-4iya7Jb76fVpQyLoiVpzUrsjQ12r3dM7fIVz+4NwoYvZOShknRmiv+iu9CClZml5ZLGb0XMcYLutK6w9tgxHDw=="],
 
